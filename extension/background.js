@@ -81,7 +81,25 @@ IMPORTANT RULES:
   }
 
   const data = await response.json();
-  let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  // Check for prompt-level blocking (content flagged before generation)
+  const blockReason = data?.promptFeedback?.blockReason;
+  if (blockReason) {
+    const ratings = data?.promptFeedback?.safetyRatings || [];
+    const blocked = ratings.filter(r => r.blocked).map(r => `${r.category}=${r.probability}`).join(', ');
+    throw new Error(`Prompt blocked by Gemini (${blockReason}): ${blocked}`);
+  }
+
+  // Check candidate-level blocking
+  const candidate = data?.candidates?.[0];
+  const finishReason = candidate?.finishReason;
+  if (finishReason && finishReason !== 'STOP') {
+    const safetyRatings = candidate?.safetyRatings || [];
+    const details = safetyRatings.map(r => `${r.category}=${r.probability}`).join(', ');
+    throw new Error(`Gemini stopped: ${finishReason} (${details})`);
+  }
+
+  let text = candidate?.content?.parts?.[0]?.text;
   if (text === undefined || text === null) {
     throw new Error('Gemini returned no translation text');
   }
