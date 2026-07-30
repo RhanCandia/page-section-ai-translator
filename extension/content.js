@@ -66,9 +66,26 @@ function injectStyles() {
       from { opacity: 0; transform: translateX(-50%) translateY(8px); }
       to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
+    /* ── Multicolor Gemini-style pulsing border ── */
     .ai-translator-translating {
-      opacity: 0.5;
-      transition: opacity 0.2s;
+      border-radius: 8px;
+      box-shadow: 0 0 0 2px rgba(66,133,244,0.5), 0 0 0 6px rgba(66,133,244,0.15);
+      animation: ai-tr-multi 2.4s ease-in-out infinite;
+    }
+    @keyframes ai-tr-multi {
+      0%   { box-shadow: 0 0 0 2px rgba(66,133,244,0.5),  0 0 0 6px rgba(66,133,244,0.15); }
+      25%  { box-shadow: 0 0 0 2px rgba(154,93,252,0.5),  0 0 0 6px rgba(154,93,252,0.15); }
+      50%  { box-shadow: 0 0 0 2px rgba(0,186,155,0.5),   0 0 0 6px rgba(0,186,155,0.15); }
+      75%  { box-shadow: 0 0 0 2px rgba(66,133,244,0.5),  0 0 0 6px rgba(66,133,244,0.15); }
+      100% { box-shadow: 0 0 0 2px rgba(66,133,244,0.5),  0 0 0 6px rgba(66,133,244,0.15); }
+    }
+    /* ── Stagger reveal for translated children ── */
+    @keyframes ai-tr-reveal {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .ai-tr-stagger {
+      animation: ai-tr-reveal 0.35s ease forwards;
     }
   `;
   document.head.appendChild(style);
@@ -343,9 +360,9 @@ function findElementSafe(selector) {
 
 async function translateElement(el, settings) {
   const originalHtml = el.innerHTML;
-  if (!originalHtml.trim()) return; // empty element, skip
+  if (!originalHtml.trim()) return;
 
-  // Mark as translating
+  // Show thin progress bar at top of element while waiting
   el.classList.add('ai-translator-translating');
 
   let response;
@@ -362,18 +379,41 @@ async function translateElement(el, settings) {
     throw err;
   }
 
+  el.classList.remove('ai-translator-translating');
+
   if (response?.error) {
     console.error('[AI Translator] Translation failed:', response.error);
-    el.classList.remove('ai-translator-translating');
     throw new Error(response.error);
   }
 
-  if (response?.translated && response.translated !== originalHtml) {
-    el.innerHTML = response.translated;
-    el.dataset.aiTranslated = settings.targetLanguage;
+  if (!response?.translated || response.translated === originalHtml) {
+    return; // nothing changed, keep original
   }
 
-  el.classList.remove('ai-translator-translating');
+  // Replace all content at once, then stagger-reveal children
+  el.innerHTML = response.translated;
+  el.dataset.aiTranslated = settings.targetLanguage;
+
+  staggerRevealChildren(el);
+}
+
+function staggerRevealChildren(el) {
+  const children = el.children;
+  if (!children.length) return;
+
+  // Set all children invisible first so they don't flash before animation kicks in
+  for (let i = 0; i < children.length; i++) {
+    children[i].style.opacity = '0';
+  }
+
+  // Start stagger on the next frame so opacity:0 renders before animation begins
+  requestAnimationFrame(() => {
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      child.classList.add('ai-tr-stagger');
+      child.style.animationDelay = `${i * 120}ms`;
+    }
+  });
 }
 
 // ── Message listener (from popup / background) ───────────────────────
