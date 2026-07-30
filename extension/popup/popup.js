@@ -43,10 +43,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
+    // Query content script for per-section translation status
+    let statusMap = {};
+    if (tabId) {
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, { action: 'getTranslationStatus' });
+        if (response?.status) statusMap = response.status;
+      } catch {
+        // Content script not injected or not reachable — no status available
+      }
+    }
+
     domainSections.forEach(section => {
       const item = document.createElement('div');
       item.className = 'section-item';
       item.dataset.id = section.id;
+
+      // Apply status indicator class
+      const status = statusMap[section.selector];
+      if (status === 'translated') item.classList.add('status-translated');
+      else if (status === 'failed') item.classList.add('status-failed');
+      else if (status === 'not-found') item.classList.add('status-not-found');
 
       const info = document.createElement('div');
       info.className = 'section-info';
