@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
 const STORAGE_KEYS = {
   SETTINGS: 'settings',
   SECTIONS: 'savedSections',
+  DOMAIN_PROMPTS: 'domainPrompts',
 };
 
 // ── Storage helpers ──────────────────────────────────────────────────
@@ -46,20 +47,23 @@ async function deleteSection(id) {
 
 // ── Gemini API ───────────────────────────────────────────────────────
 
-async function translateWithGemini(html, apiKey, model, targetLanguage) {
+async function translateWithGemini(html, apiKey, model, targetLanguage, userPrompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const prompt = `You are a precise translator. Translate the following HTML content to ${targetLanguage}.
+  let prompt = `You are a precise translator. Translate the following HTML content to ${targetLanguage}.
 
 IMPORTANT RULES:
 - Preserve ALL HTML tags, attributes, class names, and structure EXACTLY as they are.
 - Only translate the visible text content between tags.
 - Do NOT modify tag names, attribute values, class names, or IDs.
 - Keep the exact same HTML structure.
-- Return ONLY the translated HTML, no explanations or extra text.
+- Return ONLY the translated HTML, no explanations or extra text.`;
 
-HTML to translate:
-${html}`;
+  if (userPrompt && userPrompt.trim()) {
+    prompt += `\n\nADDITIONAL INSTRUCTIONS FROM THE USER:\n${userPrompt.trim()}`;
+  }
+
+  prompt += `\n\nHTML to translate:\n${html}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -111,6 +115,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'updateSettings':
       handleUpdateSettings(request.settings).then(respond, fail);
       return true;
+    case 'getDomainPrompts':
+      handleGetDomainPrompts().then(respond, fail);
+      return true;
+    case 'setDomainPrompt':
+      handleSetDomainPrompt(request).then(respond, fail);
+      return true;
     default:
       return false;
   }
@@ -125,11 +135,16 @@ async function handleTranslate({ html, domain, selector, targetLanguage }) {
       return { error: 'Gemini API key not configured. Open extension settings.' };
     }
 
+    // Look up per-domain custom instructions
+    const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
+    const userPrompt = domainPrompts[domain] || '';
+
     const translated = await translateWithGemini(
       html,
       settings.geminiApiKey,
       settings.geminiModel,
       lang,
+      userPrompt,
     );
 
     return { translated };
@@ -163,4 +178,16 @@ async function handleUpdateSettings(newSettings) {
   const merged = { ...current, ...newSettings };
   await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: merged });
   return { settings: merged };
+}
+
+async function handleGetDomainPrompts() {
+  const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
+  return { domainPrompts };
+}
+
+async function handleSetDomainPrompt({ domain, prompt }) {
+  const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
+  domainPrompts[domain] = prompt;
+  await chrome.storage.local.set({ [STORAGE_KEYS.DOMAIN_PROMPTS]: domainPrompts });
+  return { domainPrompts };
 }

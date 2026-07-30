@@ -205,11 +205,11 @@ select:focus {
   color: #ea4335;
 }
 
-/* ── Saved sections list ───────────────────────────────────────── */
+/* ── Domain management cards ──────────────────────────────────── */
 
 #all-sections-list {
-  max-height: 300px;
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
 }
 
 .empty-state {
@@ -219,16 +219,46 @@ select:focus {
   padding: 16px 0;
 }
 
+.domain-card {
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #fafbfc;
+}
+
+.domain-card:last-child {
+  margin-bottom: 0;
+}
+
+.domain-card-header {
+  margin-bottom: 10px;
+}
+
+.domain-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a73e8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.domain-card-count {
+  font-size: 11px;
+  font-weight: 400;
+  color: #9aa0a6;
+}
+
+.domain-card-sections {
+  margin-bottom: 12px;
+}
+
 .section-item {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f1f3f4;
-}
-
-.section-item:last-child {
-  border-bottom: none;
+  padding: 6px 0;
 }
 
 .section-info {
@@ -236,16 +266,9 @@ select:focus {
   min-width: 0;
 }
 
-.section-domain {
-  font-size: 12px;
-  font-weight: 500;
-  color: #1a73e8;
-}
-
 .section-label {
   font-size: 13px;
   color: #202124;
-  margin-top: 2px;
 }
 
 .section-selector {
@@ -255,7 +278,7 @@ select:focus {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .section-delete {
@@ -263,7 +286,7 @@ select:focus {
   border: none;
   cursor: pointer;
   color: #ea4335;
-  font-size: 18px;
+  font-size: 16px;
   padding: 2px 4px;
   line-height: 1;
   border-radius: 3px;
@@ -272,4 +295,80 @@ select:focus {
 
 .section-delete:hover {
   background: #fce8e6;
+}
+
+/* ── Per-domain prompt editor ────────────────────────────────── */
+
+.domain-prompt-group {
+  border-top: 1px solid #e8eaed;
+  padding-top: 12px;
+}
+
+.domain-prompt-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f6368;
+  margin-bottom: 6px;
+}
+
+.domain-prompt-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.domain-prompt-input {
+  flex: 1;
+  min-height: 52px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  background: #fff;
+  color: #202124;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+
+.domain-prompt-input:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+}
+
+.prompt-save-btn {
+  padding: 8px 14px;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: background 0.15s;
+}
+
+.prompt-save-btn:hover {
+  background: #1557b0;
+}
+
+.prompt-status {
+  font-size: 12px;
+  color: #5f6368;
+  flex-shrink: 0;
+  align-self: center;
+  min-width: 40px;
+}
+
+.prompt-status.success {
+  color: #34a853;
+}
+
+.prompt-status.error {
+  color: #ea4335;
 }
