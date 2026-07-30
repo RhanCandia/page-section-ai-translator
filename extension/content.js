@@ -317,31 +317,40 @@ async function autoTranslate() {
     return;
   }
 
+  // Translate sections in parallel batches of 3
+  const BATCH = 3;
   let translated = 0;
+
+  const eligible = [];
   for (const section of sections) {
     const el = findElementSafe(section.selector);
     if (!el) {
       console.warn(`[AI Translator] Element not found: ${section.selector}`);
       continue;
     }
-
-    // Avoid double-translating
     if (el.dataset.aiTranslated) continue;
     el.dataset.aiTranslated = 'true';
 
-    // Avoid translating the entire body or html
     const tag = el.tagName.toLowerCase();
     if (tag === 'body' || tag === 'html') {
       console.warn('[AI Translator] Refusing to translate <body> or <html> element.');
       continue;
     }
+    eligible.push(el);
+  }
 
-    try {
-      await translateElement(el, settings);
-      translated++;
-    } catch (err) {
-      console.error('[AI Translator] Translation error:', err);
-      showToast('Translation failed: check console for details', true);
+  for (let i = 0; i < eligible.length; i += BATCH) {
+    const batch = eligible.slice(i, i + BATCH);
+    const results = await Promise.allSettled(
+      batch.map(el => translateElement(el, settings))
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        translated++;
+      } else {
+        console.error('[AI Translator] Translation error:', r.reason);
+        showToast('Translation failed: check console for details', true);
+      }
     }
   }
 

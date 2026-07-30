@@ -153,6 +153,9 @@ ${userPrompt.trim()}`,
 ${html}`,
   });
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -163,9 +166,12 @@ ${html}`,
       model,
       messages,
       temperature: 0.3,
-      max_tokens: 65536,
+      max_tokens: 16384,
     }),
+    signal: controller.signal,
   });
+
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const errBody = await response.text();
