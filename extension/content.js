@@ -66,14 +66,18 @@ function injectStyles() {
       from { opacity: 0; transform: translateX(-50%) translateY(8px); }
       to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-    /* ── Pulsing border while translating ── */
+    /* ── Multicolor Gemini-style pulsing border ── */
     .ai-translator-translating {
-      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.4), 0 0 0 4px rgba(26, 115, 232, 0.08);
-      animation: ai-tr-pulse 1.2s ease-in-out infinite;
+      border-radius: 8px;
+      box-shadow: 0 0 0 2px rgba(66,133,244,0.5), 0 0 0 6px rgba(66,133,244,0.15);
+      animation: ai-tr-multi 2.4s ease-in-out infinite;
     }
-    @keyframes ai-tr-pulse {
-      0%, 100% { box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.3), 0 0 0 4px rgba(26, 115, 232, 0.05); }
-      50% { box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.6), 0 0 0 6px rgba(26, 115, 232, 0.15), 0 0 20px rgba(26, 115, 232, 0.1); }
+    @keyframes ai-tr-multi {
+      0%   { box-shadow: 0 0 0 2px rgba(66,133,244,0.5),  0 0 0 6px rgba(66,133,244,0.15); }
+      25%  { box-shadow: 0 0 0 2px rgba(154,93,252,0.5),  0 0 0 6px rgba(154,93,252,0.15); }
+      50%  { box-shadow: 0 0 0 2px rgba(0,186,155,0.5),   0 0 0 6px rgba(0,186,155,0.15); }
+      75%  { box-shadow: 0 0 0 2px rgba(66,133,244,0.5),  0 0 0 6px rgba(66,133,244,0.15); }
+      100% { box-shadow: 0 0 0 2px rgba(66,133,244,0.5),  0 0 0 6px rgba(66,133,244,0.15); }
     }
     /* ── Stagger reveal for translated children ── */
     @keyframes ai-tr-reveal {
