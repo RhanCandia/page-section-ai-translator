@@ -363,14 +363,18 @@ async function autoTranslate() {
     );
     for (let j = 0; j < results.length; j++) {
       const r = results[j];
-      const sel = selByEl.get(batch[j]);
-      if (r.status === 'fulfilled') {
+      const el = batch[j];
+      const sel = selByEl.get(el);
+      // Only count as translated if the element's content was actually replaced
+      if (el.dataset.aiTranslated === settings.targetLanguage) {
         translationStatus[sel] = 'translated';
         translated++;
       } else {
         translationStatus[sel] = 'failed';
-        console.error('[AI Translator] Translation error:', r.reason);
-        showToast('Translation failed: check console for details', true);
+        if (r.status === 'rejected') {
+          console.error('[AI Translator] Translation error:', r.reason);
+          showToast('Translation failed: check console for details', true);
+        }
       }
     }
   }

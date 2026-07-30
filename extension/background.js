@@ -268,7 +268,10 @@ async function handleTranslate({ html, domain, selector, targetLanguage }) {
     );
     return { translated };
   } catch (err) {
-    return { error: err.message };
+    const msg = err.name === 'AbortError'
+      ? 'API request timed out after 5 minutes. Try a smaller section or a different model.'
+      : err.message;
+    return { error: msg };
   }
 }
 
