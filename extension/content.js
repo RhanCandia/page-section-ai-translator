@@ -66,9 +66,21 @@ function injectStyles() {
       from { opacity: 0; transform: translateX(-50%) translateY(8px); }
       to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-    .ai-translator-translating {
-      opacity: 0.5;
-      transition: opacity 0.2s;
+    /* ── Skeleton loading bars (Google-style) ── */
+    @keyframes ai-tr-shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .ai-tr-skeleton {
+      display: block;
+      padding: 4px 0;
+    }
+    .ai-tr-sk {
+      border-radius: 6px;
+      background: linear-gradient(90deg, #e0e0e0 0%, #f5f5f5 40%, #e0e0e0 80%);
+      background-size: 200% 100%;
+      animation: ai-tr-shimmer 1.5s ease-in-out infinite;
+      margin-bottom: 10px;
     }
   `;
   document.head.appendChild(style);
@@ -341,12 +353,56 @@ function findElementSafe(selector) {
   }
 }
 
+// ── Skeleton loading generator ───────────────────────────────────────
+
+function generateSkeleton(html) {
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  const text = temp.textContent || '';
+  const charCount = text.replace(/\s/g, '').length;
+
+  if (charCount === 0) {
+    return '<div class="ai-tr-skeleton"><div class="ai-tr-sk" style="height:14px;width:60%"></div></div>';
+  }
+
+  // ~40 non-whitespace chars per bar, min 2, max 15
+  const barCount = Math.max(2, Math.min(Math.ceil(charCount / 40), 15));
+  const bars = [];
+
+  for (let i = 0; i < barCount; i++) {
+    let width, height;
+
+    if (i === 0) {
+      // First bar — thicker (like a heading), narrower
+      height = 22;
+      width = 35 + Math.random() * 20;
+    } else if (i < 3) {
+      // Next few — medium
+      height = 14;
+      width = 60 + Math.random() * 25;
+    } else {
+      // Rest — thin lines of varying width
+      height = 12;
+      width = 70 + Math.random() * 30;
+    }
+
+    // Last bar shouldn't be the widest — looks unnatural
+    if (i === barCount - 1 && width > 85) {
+      width = 55 + Math.random() * 15;
+    }
+
+    bars.push(`<div class="ai-tr-sk" style="height:${height}px;width:${Math.round(width)}%"></div>`);
+  }
+
+  return '<div class="ai-tr-skeleton">' + bars.join('') + '</div>';
+}
+
 async function translateElement(el, settings) {
   const originalHtml = el.innerHTML;
   if (!originalHtml.trim()) return; // empty element, skip
 
-  // Mark as translating
-  el.classList.add('ai-translator-translating');
+  // Replace content with skeleton loading placeholders
+  el.innerHTML = generateSkeleton(originalHtml);
 
   let response;
   try {
@@ -358,22 +414,22 @@ async function translateElement(el, settings) {
     });
   } catch (err) {
     console.error('[AI Translator] Translation request failed:', err);
-    el.classList.remove('ai-translator-translating');
+    el.innerHTML = originalHtml; // restore original
     throw err;
   }
 
   if (response?.error) {
     console.error('[AI Translator] Translation failed:', response.error);
-    el.classList.remove('ai-translator-translating');
+    el.innerHTML = originalHtml; // restore original
     throw new Error(response.error);
   }
 
   if (response?.translated && response.translated !== originalHtml) {
     el.innerHTML = response.translated;
     el.dataset.aiTranslated = settings.targetLanguage;
+  } else {
+    el.innerHTML = originalHtml; // no change, restore
   }
-
-  el.classList.remove('ai-translator-translating');
 }
 
 // ── Message listener (from popup / background) ───────────────────────
