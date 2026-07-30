@@ -179,9 +179,7 @@ ${html}`,
     throw new Error('OpenCode Zen returned no translation text');
   }
   // Strip possible markdown code fences
-  text = text.replace(/^```(?:html)?\s*
-?/gm, '').replace(/
-?```\s*$/gm, '').trim();
+  text = text.replace(/^```(?:html)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '').trim();
   return text;
 }
 
