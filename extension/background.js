@@ -68,7 +68,7 @@ IMPORTANT RULES:
   prompt += `\n\nHTML to translate:\n${html}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min
+  const timeout = setTimeout(() => controller.abort(), 300000); // 5 min
 
   const response = await fetch(url, {
     method: 'POST',
@@ -160,7 +160,7 @@ ${html}`,
   });
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min
+  const timeout = setTimeout(() => controller.abort(), 300000); // 5 min
 
   const response = await fetch(url, {
     method: 'POST',
