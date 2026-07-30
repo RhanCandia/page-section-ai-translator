@@ -5,6 +5,8 @@ const DEFAULT_SETTINGS = {
   provider: 'gemini',
   geminiApiKey: '',
   geminiModel: 'gemini-2.0-flash',
+  openCodeZenApiKey: '',
+  openCodeZenModel: 'deepseek-v4-flash-free',
   targetLanguage: 'Spanish',
   autoTranslate: true,
 };
@@ -72,6 +74,12 @@ IMPORTANT RULES:
       contents: [{
         parts: [{ text: prompt }],
       }],
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+      ],
     }),
   });
 
@@ -105,6 +113,75 @@ IMPORTANT RULES:
   }
   // Strip possible markdown code fences that some models wrap responses in
   text = text.replace(/^```(?:html)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '').trim();
+  return text;
+}
+
+// ── OpenCode Zen API ─────────────────────────────────────────────────
+
+async function translateWithOpenCodeZen(html, apiKey, model, targetLanguage, userPrompt) {
+  const url = 'https://opencode.ai/zen/v1/chat/completions';
+
+  const messages = [
+    {
+      role: 'system',
+      content: `You are a precise translator. Translate the following HTML content to ${targetLanguage}.
+
+IMPORTANT RULES:
+- Preserve ALL HTML tags, attributes, class names, and structure EXACTLY as they are.
+- Only translate the visible text content between tags.
+- Do NOT modify tag names, attribute values, class names, or IDs.
+- Keep the exact same HTML structure.
+- Return ONLY the translated HTML, no explanations or extra text.`,
+    },
+  ];
+
+  if (userPrompt && userPrompt.trim()) {
+    messages.push({
+      role: 'user',
+      content: `ADDITIONAL INSTRUCTIONS:
+${userPrompt.trim()}`,
+    });
+    messages.push({
+      role: 'assistant',
+      content: 'Understood. I will follow those instructions.',
+    });
+  }
+
+  messages.push({
+    role: 'user',
+    content: `HTML to translate:
+${html}`,
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.3,
+      max_tokens: 65536,
+    }),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`OpenCode Zen API error ${response.status}: ${errBody}`);
+  }
+
+  const data = await response.json();
+
+  let text = data?.choices?.[0]?.message?.content;
+  if (text === undefined || text === null) {
+    throw new Error('OpenCode Zen returned no translation text');
+  }
+  // Strip possible markdown code fences
+  text = text.replace(/^```(?:html)?\s*
+?/gm, '').replace(/
+?```\s*$/gm, '').trim();
   return text;
 }
 
@@ -148,15 +225,30 @@ async function handleTranslate({ html, domain, selector, targetLanguage }) {
   try {
     const settings = await getSettings();
     const lang = targetLanguage || settings.targetLanguage;
-
-    if (!settings.geminiApiKey) {
-      return { error: 'Gemini API key not configured. Open extension settings.' };
-    }
+    const provider = settings.provider || 'gemini';
 
     // Look up per-domain custom instructions
     const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
     const userPrompt = domainPrompts[domain] || '';
 
+    if (provider === 'opencode-zen') {
+      if (!settings.openCodeZenApiKey) {
+        return { error: 'OpenCode Zen API key not configured. Open extension settings.' };
+      }
+      const translated = await translateWithOpenCodeZen(
+        html,
+        settings.openCodeZenApiKey,
+        settings.openCodeZenModel,
+        lang,
+        userPrompt,
+      );
+      return { translated };
+    }
+
+    // Default: Gemini
+    if (!settings.geminiApiKey) {
+      return { error: 'Gemini API key not configured. Open extension settings.' };
+    }
     const translated = await translateWithGemini(
       html,
       settings.geminiApiKey,
@@ -164,7 +256,6 @@ async function handleTranslate({ html, domain, selector, targetLanguage }) {
       lang,
       userPrompt,
     );
-
     return { translated };
   } catch (err) {
     return { error: err.message };

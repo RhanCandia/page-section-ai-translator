@@ -3,9 +3,13 @@
 document.addEventListener('DOMContentLoaded', async () => {
   // ── DOM refs ──────────────────────────────────────────────────────
 
-  const apiKeyInput = document.getElementById('api-key');
-  const toggleKeyBtn = document.getElementById('toggle-key-visibility');
-  const modelInput = document.getElementById('model');
+  const providerSelect = document.getElementById('provider');
+  const geminiApiKeyInput = document.getElementById('gemini-api-key');
+  const geminiModelInput = document.getElementById('gemini-model');
+  const toggleGeminiKeyBtn = document.getElementById('toggle-gemini-key');
+  const ocZenApiKeyInput = document.getElementById('oc-zen-api-key');
+  const ocZenModelInput = document.getElementById('oc-zen-model');
+  const toggleOcZenKeyBtn = document.getElementById('toggle-oc-zen-key');
   const targetLangInput = document.getElementById('target-lang');
   const autoTranslateCheck = document.getElementById('auto-translate');
   const saveBtn = document.getElementById('save-btn');
@@ -14,14 +18,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   const testStatus = document.getElementById('test-status');
   const allSectionsList = document.getElementById('all-sections-list');
 
+  // ── Show/hide provider sections ──────────────────────────────────
+
+  function toggleProviderSections(provider) {
+    document.querySelectorAll('.provider-section').forEach(el => {
+      el.style.display = el.dataset.provider === provider ? '' : 'none';
+    });
+  }
+
   // ── Load settings ─────────────────────────────────────────────────
 
   async function loadSettings() {
     const { settings } = await chrome.runtime.sendMessage({ action: 'getSettings' });
     if (!settings) return;
 
-    apiKeyInput.value = settings.geminiApiKey || '';
-    modelInput.value = settings.geminiModel || 'gemini-2.0-flash';
+    providerSelect.value = settings.provider || 'gemini';
+    toggleProviderSections(providerSelect.value);
+
+    geminiApiKeyInput.value = settings.geminiApiKey || '';
+    geminiModelInput.value = settings.geminiModel || 'gemini-2.0-flash';
+    ocZenApiKeyInput.value = settings.openCodeZenApiKey || '';
+    ocZenModelInput.value = settings.openCodeZenModel || 'deepseek-v4-flash-free';
     targetLangInput.value = settings.targetLanguage || 'Spanish';
     autoTranslateCheck.checked = settings.autoTranslate !== false;
   }
@@ -188,8 +205,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   saveBtn.addEventListener('click', async () => {
     const settings = {
-      geminiApiKey: apiKeyInput.value.trim(),
-      geminiModel: modelInput.value,
+      provider: providerSelect.value,
+      geminiApiKey: geminiApiKeyInput.value.trim(),
+      geminiModel: geminiModelInput.value || 'gemini-2.0-flash',
+      openCodeZenApiKey: ocZenApiKeyInput.value.trim(),
+      openCodeZenModel: ocZenModelInput.value || 'deepseek-v4-flash-free',
       targetLanguage: targetLangInput.value.trim() || 'Spanish',
       autoTranslate: autoTranslateCheck.checked,
     };
@@ -217,62 +237,117 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Test API key ──────────────────────────────────────────────────
 
-  testBtn.addEventListener('click', async () => {
-    const apiKey = apiKeyInput.value.trim();
-    if (!apiKey) {
-      testStatus.textContent = 'Enter an API key first.';
-      testStatus.className = 'error';
-      return;
-    }
+  async function testProvider() {
+    const provider = providerSelect.value;
 
-    const model = modelInput.value;
-    testStatus.textContent = 'Testing...';
-    testStatus.className = '';
-
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: 'Reply with exactly the word: OK' }],
-            }],
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const err = await response.text();
-        testStatus.textContent = `API error (${response.status}): ${err.slice(0, 200)}`;
+    if (provider === 'gemini') {
+      const apiKey = geminiApiKeyInput.value.trim();
+      if (!apiKey) {
+        testStatus.textContent = 'Enter a Gemini API key first.';
         testStatus.className = 'error';
         return;
       }
+      const model = geminiModelInput.value || 'gemini-2.0-flash';
+      testStatus.textContent = 'Testing Gemini key...';
+      testStatus.className = '';
 
-      testStatus.textContent = 'API key works!';
-      testStatus.className = 'success';
-    } catch (err) {
-      testStatus.textContent = `Network error: ${err.message}`;
-      testStatus.className = 'error';
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: 'Reply with exactly the word: OK' }],
+              }],
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const err = await response.text();
+          testStatus.textContent = `Gemini error (${response.status}): ${err.slice(0, 200)}`;
+          testStatus.className = 'error';
+          return;
+        }
+
+        testStatus.textContent = 'Gemini API key works!';
+        testStatus.className = 'success';
+      } catch (err) {
+        testStatus.textContent = `Network error: ${err.message}`;
+        testStatus.className = 'error';
+      }
+    } else {
+      // OpenCode Zen
+      const apiKey = ocZenApiKeyInput.value.trim();
+      if (!apiKey) {
+        testStatus.textContent = 'Enter an OpenCode Zen API key first.';
+        testStatus.className = 'error';
+        return;
+      }
+      const model = ocZenModelInput.value || 'deepseek-v4-flash-free';
+      testStatus.textContent = 'Testing OpenCode Zen key...';
+      testStatus.className = '';
+
+      try {
+        const response = await fetch('https://opencode.ai/zen/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'user', content: 'Reply with exactly the word: OK' },
+            ],
+            max_tokens: 10,
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.text();
+          testStatus.textContent = `OpenCode Zen error (${response.status}): ${err.slice(0, 200)}`;
+          testStatus.className = 'error';
+          return;
+        }
+
+        testStatus.textContent = 'OpenCode Zen API key works!';
+        testStatus.className = 'success';
+      } catch (err) {
+        testStatus.textContent = `Network error: ${err.message}`;
+        testStatus.className = 'error';
+      }
     }
 
     setTimeout(() => {
       testStatus.textContent = '';
       testStatus.className = '';
     }, 4000);
-  });
+  }
+
+  testBtn.addEventListener('click', testProvider);
 
   // ── Toggle key visibility ─────────────────────────────────────────
 
-  toggleKeyBtn.addEventListener('click', () => {
-    if (apiKeyInput.type === 'password') {
-      apiKeyInput.type = 'text';
-      toggleKeyBtn.textContent = '\u{1F441}';
+  function toggleInput(btn, input) {
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '\u{1F441}';
     } else {
-      apiKeyInput.type = 'password';
-      toggleKeyBtn.textContent = '\u{1F441}';
+      input.type = 'password';
+      btn.textContent = '\u{1F441}';
     }
+  }
+
+  toggleGeminiKeyBtn.addEventListener('click', () => toggleInput(toggleGeminiKeyBtn, geminiApiKeyInput));
+  toggleOcZenKeyBtn.addEventListener('click', () => toggleInput(toggleOcZenKeyBtn, ocZenApiKeyInput));
+
+  // ── Provider switch ───────────────────────────────────────────────
+
+  providerSelect.addEventListener('change', () => {
+    toggleProviderSections(providerSelect.value);
   });
 
   // ── Init ──────────────────────────────────────────────────────────
