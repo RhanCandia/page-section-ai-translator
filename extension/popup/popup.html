@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=320" />
+  <title>AI Translator</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AI Translate</h1>
+      <button id="settings-btn" class="icon-btn" title="Settings">&#9881;</button>
+    </header>
+
+    <section id="domain-section">
+      <p id="domain-label" class="domain">Loading...</p>
+    </section>
+
+    <section id="actions">
+      <button id="pick-section" class="btn-primary">&#43; Pick Section</button>
+    </section>
+
+    <section id="sections-section">
+      <h2>Saved Sections</h2>
+      <div id="sections-list">
+        <p class="empty-state">No sections saved for this domain.</p>
+      </div>
+    </section>
+
+    <footer>
+      <span id="status"></span>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=600" />
+  <title>AI Translator — Settings</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AI Translator Settings</h1>
+    </header>
+
+    <!-- Provider -->
+    <section>
+      <h2>Provider</h2>
+      <div class="field">
+        <label for="provider">AI Provider</label>
+        <select id="provider" disabled>
+          <option value="gemini">Google Gemini</option>
+        </select>
+        <p class="hint">More providers coming soon.</p>
+      </div>
+    </section>
+
+    <!-- Gemini -->
+    <section id="gemini-settings">
+      <h2>Gemini Configuration</h2>
+
+      <div class="field">
+        <label for="api-key">API Key</label>
+        <div class="input-row">
+          <input type="password" id="api-key" placeholder="Enter your Gemini API key" />
+          <button id="toggle-key-visibility" class="small-btn" title="Show/Hide key">&#128065;</button>
+        </div>
+        <p class="hint">
+          Get a key from
+          <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="model">Model</label>
+        <input type="text" id="model" list="model-suggestions" placeholder="gemini-2.0-flash" />
+        <datalist id="model-suggestions">
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+          <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite</option>
+          <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+          <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+          <option value="gemini-2.5-pro-exp-03-25">Gemini 2.5 Pro (exp)</option>
+          <option value="gemini-2.0-flash-thinking-exp-01-21">Gemini 2.0 Flash Thinking (exp)</option>
+        </datalist>
+        <p class="hint">Type any model name or pick from suggestions.</p>
+      </div>
+    </section>
+
+    <!-- Translation -->
+    <section>
+      <h2>Translation</h2>
+
+      <div class="field">
+        <label for="target-lang">Target Language</label>
+        <input type="text" id="target-lang" placeholder="e.g. Spanish, French, Chinese, Japanese" />
+        <p class="hint">The language you want sections translated into.</p>
+      </div>
+
+      <div class="field checkbox-row">
+        <input type="checkbox" id="auto-translate" />
+        <label for="auto-translate">Auto-translate matching sections on page load</label>
+      </div>
+    </section>
+
+    <!-- Saved Sections -->
+    <section>
+      <h2>Saved Sections</h2>
+      <div id="all-sections-list">
+        <p class="empty-state">No sections saved yet. Open a page and use "Pick Section" from the extension popup.</p>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <section class="actions">
+      <button id="save-btn" class="btn-primary">Save Settings</button>
+      <span id="save-status"></span>
+    </section>
+
+    <!-- Test -->
+    <section class="actions">
+      <button id="test-btn" class="btn-secondary">Test API Key</button>
+      <span id="test-status"></span>
+    </section>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
