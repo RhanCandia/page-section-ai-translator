@@ -66,24 +66,14 @@ function injectStyles() {
       from { opacity: 0; transform: translateX(-50%) translateY(8px); }
       to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
-    /* ── Progress bar while translating ── */
-    @keyframes ai-tr-bar {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
+    /* ── Pulsing border while translating ── */
     .ai-translator-translating {
-      position: relative;
+      box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.4), 0 0 0 4px rgba(26, 115, 232, 0.08);
+      animation: ai-tr-pulse 1.2s ease-in-out infinite;
     }
-    .ai-translator-translating::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #1a73e8 30%, #66b5ff 50%, #1a73e8 70%);
-      background-size: 200% 100%;
-      animation: ai-tr-bar 1.5s ease-in-out infinite;
-      border-radius: 2px;
-      pointer-events: none;
+    @keyframes ai-tr-pulse {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.3), 0 0 0 4px rgba(26, 115, 232, 0.05); }
+      50% { box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.6), 0 0 0 6px rgba(26, 115, 232, 0.15), 0 0 20px rgba(26, 115, 232, 0.1); }
     }
     /* ── Stagger reveal for translated children ── */
     @keyframes ai-tr-reveal {
@@ -407,11 +397,19 @@ function staggerRevealChildren(el) {
   const children = el.children;
   if (!children.length) return;
 
+  // Set all children invisible first so they don't flash before animation kicks in
   for (let i = 0; i < children.length; i++) {
-    const child = children[i];
-    child.classList.add('ai-tr-stagger');
-    child.style.animationDelay = `${i * 120}ms`;
+    children[i].style.opacity = '0';
   }
+
+  // Start stagger on the next frame so opacity:0 renders before animation begins
+  requestAnimationFrame(() => {
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      child.classList.add('ai-tr-stagger');
+      child.style.animationDelay = `${i * 120}ms`;
+    }
+  });
 }
 
 // ── Message listener (from popup / background) ───────────────────────
