@@ -368,8 +368,22 @@ function findElementSafe(selector) {
 }
 
 async function translateElement(el, settings) {
-  const originalHtml = el.innerHTML;
+  let originalHtml = el.innerHTML;
   if (!originalHtml.trim()) return;
+
+  // Cap HTML size to avoid slow API calls and message size limits
+  const MAX_HTML_SIZE = 50000;
+  if (originalHtml.length > MAX_HTML_SIZE) {
+    console.warn(
+      `[AI Translator] Section HTML is ${originalHtml.length} chars, truncating to ~${MAX_HTML_SIZE}`
+    );
+    // Truncate at the last closing angle bracket before the limit
+    const truncated = originalHtml.slice(0, MAX_HTML_SIZE);
+    const lastClose = truncated.lastIndexOf('>');
+    originalHtml = lastClose > MAX_HTML_SIZE * 0.8
+      ? truncated.slice(0, lastClose + 1)
+      : truncated;
+  }
 
   // Show thin progress bar at top of element while waiting
   el.classList.add('ai-translator-translating');

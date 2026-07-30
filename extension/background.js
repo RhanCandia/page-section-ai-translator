@@ -67,6 +67,9 @@ IMPORTANT RULES:
 
   prompt += `\n\nHTML to translate:\n${html}`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -81,7 +84,10 @@ IMPORTANT RULES:
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
       ],
     }),
+    signal: controller.signal,
   });
+
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const errBody = await response.text();
