@@ -165,6 +165,29 @@ header h1 {
   background: #fce8e6;
 }
 
+/* ── Translation status indicators ────────────────────────────── */
+
+.section-item.status-translated {
+  background: #e6f4ea;
+  border-radius: 6px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
+.section-item.status-failed {
+  background: #fce8e6;
+  border-radius: 6px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
+.section-item.status-not-found {
+  background: #fef7e0;
+  border-radius: 6px;
+  padding: 8px;
+  margin: 4px 0;
+}
+
 /* ── Footer ───────────────────────────────────────────────────── */
 
 footer {

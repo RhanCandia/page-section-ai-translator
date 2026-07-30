@@ -8,6 +8,10 @@ let hoveredEl = null;
 const overlayId = 'ai-translator-overlay';
 const toastId = 'ai-translator-toast';
 
+// Per-section translation status, keyed by selector
+// Values: 'translated' | 'failed' | 'not-found' | 'skipped'
+const translationStatus = {};
+
 // ── CSS injection ────────────────────────────────────────────────────
 
 const STYLE_ID = 'ai-translator-styles';
@@ -323,20 +327,33 @@ async function autoTranslate() {
 
   const eligible = [];
   for (const section of sections) {
-    const el = findElementSafe(section.selector);
+    const sel = section.selector;
+    const el = findElementSafe(sel);
     if (!el) {
-      console.warn(`[AI Translator] Element not found: ${section.selector}`);
+      translationStatus[sel] = 'not-found';
       continue;
     }
-    if (el.dataset.aiTranslated) continue;
+    if (el.dataset.aiTranslated) {
+      translationStatus[sel] = 'translated';
+      continue;
+    }
     el.dataset.aiTranslated = 'true';
 
     const tag = el.tagName.toLowerCase();
     if (tag === 'body' || tag === 'html') {
-      console.warn('[AI Translator] Refusing to translate <body> or <html> element.');
+      translationStatus[sel] = 'skipped';
       continue;
     }
     eligible.push(el);
+  }
+
+  // Map eligible elements back to their selectors
+  const selByEl = new Map();
+  for (const section of sections) {
+    const el = findElementSafe(section.selector);
+    if (el && eligible.includes(el)) {
+      selByEl.set(el, section.selector);
+    }
   }
 
   for (let i = 0; i < eligible.length; i += BATCH) {
@@ -344,10 +361,14 @@ async function autoTranslate() {
     const results = await Promise.allSettled(
       batch.map(el => translateElement(el, settings))
     );
-    for (const r of results) {
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j];
+      const sel = selByEl.get(batch[j]);
       if (r.status === 'fulfilled') {
+        translationStatus[sel] = 'translated';
         translated++;
       } else {
+        translationStatus[sel] = 'failed';
         console.error('[AI Translator] Translation error:', r.reason);
         showToast('Translation failed: check console for details', true);
       }
@@ -448,6 +469,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === 'exitPickMode') {
     exitPickMode();
     sendResponse({ ok: true });
+  } else if (request.action === 'getTranslationStatus') {
+    sendResponse({ status: { ...translationStatus } });
   } else {
     return false; // not handled
   }
