@@ -26,10 +26,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     autoTranslateCheck.checked = settings.autoTranslate !== false;
   }
 
-  // ── Load sections ─────────────────────────────────────────────────
+  // ── Load domain prompts ───────────────────────────────────────────
+
+  let domainPromptsCache = {};
+
+  async function loadDomainPrompts() {
+    const { domainPrompts } = await chrome.runtime.sendMessage({ action: 'getDomainPrompts' });
+    domainPromptsCache = domainPrompts || {};
+    return domainPromptsCache;
+  }
+
+  async function saveDomainPrompt(domain, prompt) {
+    domainPromptsCache[domain] = prompt;
+    const { domainPrompts } = await chrome.runtime.sendMessage({
+      action: 'setDomainPrompt',
+      domain,
+      prompt,
+    });
+    domainPromptsCache = domainPrompts;
+  }
+
+  // ── Load sections (grouped by domain) ─────────────────────────────
 
   async function loadAllSections() {
-    const { savedSections = [] } = await chrome.storage.local.get('savedSections');
+    const [savedSections, domainPrompts] = await Promise.all([
+      chrome.storage.local.get('savedSections').then(r => r.savedSections || []),
+      loadDomainPrompts(),
+    ]);
 
     allSectionsList.innerHTML = '';
 
@@ -39,21 +62,52 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // Sort by domain then date
-    savedSections.sort((a, b) => a.domain.localeCompare(b.domain) || (b.createdAt || 0) - (a.createdAt || 0));
+    // Group by domain, sort alphabetically
+    const byDomain = {};
+    for (const s of savedSections) {
+      if (!byDomain[s.domain]) byDomain[s.domain] = [];
+      byDomain[s.domain].push(s);
+    }
 
-    for (const section of savedSections) {
+    const domains = Object.keys(byDomain).sort();
+
+    for (const domain of domains) {
+      const card = buildDomainCard(domain, byDomain[domain], domainPrompts[domain] || '');
+      allSectionsList.appendChild(card);
+    }
+  }
+
+  function buildDomainCard(domain, sections, currentPrompt) {
+    const card = document.createElement('div');
+    card.className = 'domain-card';
+
+    // ── Domain header ─────────────────────────────────────────────
+    const header = document.createElement('div');
+    header.className = 'domain-card-header';
+
+    const title = document.createElement('div');
+    title.className = 'domain-card-title';
+    title.textContent = domain;
+
+    const count = document.createElement('span');
+    count.className = 'domain-card-count';
+    count.textContent = `${sections.length} section${sections.length !== 1 ? 's' : ''}`;
+    title.appendChild(count);
+
+    header.appendChild(title);
+    card.appendChild(header);
+
+    // ── Sections list ─────────────────────────────────────────────
+    const list = document.createElement('div');
+    list.className = 'domain-card-sections';
+
+    for (const section of sections) {
       const item = document.createElement('div');
       item.className = 'section-item';
       item.dataset.id = section.id;
 
       const info = document.createElement('div');
       info.className = 'section-info';
-
-      const domain = document.createElement('div');
-      domain.className = 'section-domain';
-      domain.textContent = section.domain;
-      info.appendChild(domain);
 
       const label = document.createElement('div');
       label.className = 'section-label';
@@ -76,8 +130,58 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       item.appendChild(info);
       item.appendChild(delBtn);
-      allSectionsList.appendChild(item);
+      list.appendChild(item);
     }
+
+    card.appendChild(list);
+
+    // ── Prompt editor ─────────────────────────────────────────────
+    const promptGroup = document.createElement('div');
+    promptGroup.className = 'domain-prompt-group';
+
+    const promptLabel = document.createElement('label');
+    promptLabel.className = 'domain-prompt-label';
+    promptLabel.textContent = 'Custom instructions for this domain';
+    promptGroup.appendChild(promptLabel);
+
+    const promptRow = document.createElement('div');
+    promptRow.className = 'domain-prompt-row';
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'domain-prompt-input';
+    textarea.placeholder = 'e.g. Use formal tone, keep proper nouns untranslated, preserve technical terms in English...';
+    textarea.value = currentPrompt;
+    promptRow.appendChild(textarea);
+
+    const savePromptBtn = document.createElement('button');
+    savePromptBtn.className = 'small-btn prompt-save-btn';
+    savePromptBtn.textContent = 'Save';
+    promptRow.appendChild(savePromptBtn);
+
+    const promptStatus = document.createElement('span');
+    promptStatus.className = 'prompt-status';
+    promptRow.appendChild(promptStatus);
+
+    promptGroup.appendChild(promptRow);
+
+    savePromptBtn.addEventListener('click', async () => {
+      const val = textarea.value;
+      try {
+        await saveDomainPrompt(domain, val);
+        promptStatus.textContent = 'Saved';
+        promptStatus.className = 'prompt-status success';
+      } catch (err) {
+        promptStatus.textContent = `Error: ${err.message}`;
+        promptStatus.className = 'prompt-status error';
+      }
+      setTimeout(() => {
+        promptStatus.textContent = '';
+        promptStatus.className = 'prompt-status';
+      }, 2500);
+    });
+
+    card.appendChild(promptGroup);
+    return card;
   }
 
   // ── Save settings ─────────────────────────────────────────────────
@@ -164,7 +268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   toggleKeyBtn.addEventListener('click', () => {
     if (apiKeyInput.type === 'password') {
       apiKeyInput.type = 'text';
-      toggleKeyBtn.textContent = '\u{1F441}'; // eye emoji (or use a text alternative)
+      toggleKeyBtn.textContent = '\u{1F441}';
     } else {
       apiKeyInput.type = 'password';
       toggleKeyBtn.textContent = '\u{1F441}';
