@@ -108,6 +108,10 @@ If you enjoy using **Page Section AI Translator** or it saves you time, consider
 
 <a href="https://ko-fi.com/rhncnd" target="_blank"><img src="https://storage.ko-fi.com/cdn/kofi3.png?v=3" height="36" style="border:0px;height:36px;" alt="Buy Me a Coffee at ko-fi.com" /></a>
 
+## Privacy Policy
+
+Page Section AI Translator stores all API keys and preferences locally on your device and does not collect or track user data. Read our full [Privacy Policy](PRIVACY.md).
+
 ## Contributing
 
 1. Create a feature branch from `master`
