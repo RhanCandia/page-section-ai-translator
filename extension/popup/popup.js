@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const domainLabel = document.getElementById('domain-label');
   const pickBtn = document.getElementById('pick-section');
+  const retranslateBtn = document.getElementById('retranslate-btn');
   const settingsBtn = document.getElementById('settings-btn');
   const sectionsList = document.getElementById('sections-list');
   const statusEl = document.getElementById('status');
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       domainLabel.textContent = 'No active page';
       pickBtn.disabled = true;
+      if (retranslateBtn) retranslateBtn.disabled = true;
       return;
     }
   } catch (err) {
@@ -40,8 +42,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (domainSections.length === 0) {
       sectionsList.innerHTML = '<p class="empty-state">No sections saved for this domain.</p>';
+      if (retranslateBtn) retranslateBtn.disabled = true;
       return;
     }
+
+    if (retranslateBtn) retranslateBtn.disabled = false;
 
     // Query content script for per-section translation status
     let statusMap = {};
@@ -103,11 +108,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!tabId) return;
 
     try {
-      // Check if content script is injected/accessible
       await chrome.tabs.sendMessage(tabId, { action: 'enterPickMode' });
-      window.close(); // popup closes; content script stays active
+      window.close();
     } catch (err) {
-      // Content script might not be injected yet — try injecting it
       try {
         await chrome.scripting.executeScript({
           target: { tabId },
@@ -120,6 +123,48 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   });
+
+  // ── Force Re-translate ──────────────────────────────────────────
+
+  if (retranslateBtn) {
+    retranslateBtn.addEventListener('click', async () => {
+      if (!tabId) return;
+      retranslateBtn.disabled = true;
+      setStatus('Re-translating...');
+
+      try {
+        const response = await chrome.tabs.sendMessage(tabId, { action: 'forceReTranslate' });
+        if (response?.error) {
+          setStatus(`Error: ${response.error}`, 'error');
+        } else {
+          setStatus('Re-translation started', 'success');
+          setTimeout(async () => {
+            await loadSections();
+          }, 1000);
+        }
+      } catch (err) {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            files: ['content.js'],
+          });
+          const response = await chrome.tabs.sendMessage(tabId, { action: 'forceReTranslate' });
+          if (response?.error) {
+            setStatus(`Error: ${response.error}`, 'error');
+          } else {
+            setStatus('Re-translation started', 'success');
+            setTimeout(async () => {
+              await loadSections();
+            }, 1000);
+          }
+        } catch (injectErr) {
+          setStatus(`Failed to communicate with tab: ${injectErr.message}`, 'error');
+        }
+      } finally {
+        retranslateBtn.disabled = false;
+      }
+    });
+  }
 
   // ── Settings & Links ────────────────────────────────────────────
 

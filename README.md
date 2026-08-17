@@ -10,6 +10,14 @@ A Chrome extension that lets you pick any section of a webpage, save it by domai
 
 **Auto-translate on page load** — Every time you visit a saved domain, matching sections are automatically translated via your chosen provider. Original content stays visible during the API call.
 
+**Token-Efficient Translation** — Extracts and sends only visible text segments with compact inline placeholders (`[0]...[/0]`) instead of raw HTML with nested tags, attributes, class names, styles, and SVGs. This cuts token consumption by 70–90% and keeps styles and event listeners completely intact.
+
+**Local Response Caching** — Stores translated strings locally in `chrome.storage.local`. Repeated page loads or visits to the same page fetch translations instantly with **0 API tokens used**.
+
+**Force Re-translate** — Click the "Re-translate" button in the popup to bypass the cache on demand and fetch a fresh translation from the AI provider.
+
+**Cache Management** — View cache size and entry statistics in Settings, with one-click cache clearing.
+
 **Progress indicator** — While translating, the section gets a multicolor pulsing border (blue -> purple -> teal). When the translation arrives, child elements stagger-fade in one by one.
 
 **Per-domain custom instructions** — Set translation style, tone, or rules per domain in Settings. Prompts are injected into the API call alongside the text. Ideal for controlling honorifics, censorship, terminology, or formality.
@@ -43,7 +51,7 @@ Navigate to any page, click the extension icon, then **Pick Section**. Hover ove
 
 ### 3. Done
 
-Reload the page. The section gets a pulsing border while Gemini translates it, then the translated content fades in.
+Reload the page. The section gets a pulsing border while the AI translates it, then the translated content fades in. Subsequent visits load instantly from cache!
 
 ### 4. Custom instructions per domain (optional)
 
@@ -58,12 +66,12 @@ Click **Save**. All future translations for that domain will include your prompt
 ```
 extension/
   manifest.json        # MV3 manifest
-  background.js        # Service worker: message router, Gemini API proxy, storage
-  content.js           # Injected script: pick mode, auto-translate, stagger reveal
+  background.js        # Service worker: message router, AI API proxy, response caching, storage
+  content.js           # Injected script: pick mode, DOM text extraction, auto-translate, stagger reveal
   popup/
-    popup.html/.js/.css    # Quick actions: Pick Section, list saved for domain
+    popup.html/.js/.css    # Quick actions: Pick Section, Re-translate, list saved for domain
   settings/
-    settings.html/.js/.css # API key, model, language, domain prompts, manage sections
+    settings.html/.js/.css # API key, model, language, domain prompts, cache management, manage sections
   icons/
 ```
 
@@ -71,9 +79,11 @@ extension/
 
 ```
 Page loads -> content.js checks storage for matching domain sections
-           -> background.js builds prompt (rules + custom instructions if set)
-           -> Selected provider API called with full innerHTML (preserves HTML structure)
-           -> Translated HTML replaces original, children stagger-reveal with fade-in
+           -> content.js extracts visible text segments and inline placeholders ([0]...[/0])
+           -> background.js checks translationCache (returns instantly if cached)
+           -> If uncached or force-retranslating, background.js calls selected provider API
+           -> Translations are saved to local cache (with LRU eviction)
+           -> content.js applies translations directly to DOM text nodes without breaking HTML
            -> On error, original content is untouched (never removed)
 ```
 
@@ -81,9 +91,10 @@ Page loads -> content.js checks storage for matching domain sections
 
 Storage keys in `chrome.storage.local`:
 
-- `settings` — Provider, API keys, model, target language, auto-translate toggle
+- `settings` — Provider, API keys, model, target language, auto-translate toggle, cacheEnabled
 - `savedSections` — Array of `{ id, domain, selector, label, createdAt }`
 - `domainPrompts` — Object mapping `domain -> custom instruction string`
+- `translationCache` — Object mapping hash keys to `{ original, translated, lastAccessed }`
 
 ## Supported providers
 

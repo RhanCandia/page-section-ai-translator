@@ -12,6 +12,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleOcZenKeyBtn = document.getElementById('toggle-oc-zen-key');
   const targetLangInput = document.getElementById('target-lang');
   const autoTranslateCheck = document.getElementById('auto-translate');
+  const cacheEnabledCheck = document.getElementById('cache-enabled');
+  const cacheStatsLabel = document.getElementById('cache-stats-label');
+  const clearCacheBtn = document.getElementById('clear-cache-btn');
+  const cacheStatus = document.getElementById('cache-status');
   const saveBtn = document.getElementById('save-btn');
   const saveStatus = document.getElementById('save-status');
   const testBtn = document.getElementById('test-btn');
@@ -41,7 +45,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     ocZenModelInput.value = settings.openCodeZenModel || 'deepseek-v4-flash-free';
     targetLangInput.value = settings.targetLanguage || 'Spanish';
     autoTranslateCheck.checked = settings.autoTranslate !== false;
+    cacheEnabledCheck.checked = settings.cacheEnabled !== false;
   }
+
+  // ── Cache Stats & Clearing ────────────────────────────────────────
+
+  async function loadCacheStats() {
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: 'getCacheStats' });
+      if (resp && typeof resp.count === 'number') {
+        const kb = (resp.bytes / 1024).toFixed(1);
+        cacheStatsLabel.textContent = `${resp.count} cached item${resp.count !== 1 ? 's' : ''} (~${kb} KB)`;
+      } else {
+        cacheStatsLabel.textContent = 'Cache stats unavailable';
+      }
+    } catch {
+      cacheStatsLabel.textContent = '0 cached items';
+    }
+  }
+
+  clearCacheBtn.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to clear all cached translations?')) return;
+    clearCacheBtn.disabled = true;
+    cacheStatus.textContent = 'Clearing...';
+    cacheStatus.className = 'cache-status';
+
+    try {
+      await chrome.runtime.sendMessage({ action: 'clearCache' });
+      cacheStatus.textContent = 'Cache cleared!';
+      cacheStatus.className = 'cache-status success';
+      await loadCacheStats();
+    } catch (err) {
+      cacheStatus.textContent = `Error: ${err.message}`;
+      cacheStatus.className = 'cache-status error';
+    } finally {
+      clearCacheBtn.disabled = false;
+      setTimeout(() => {
+        cacheStatus.textContent = '';
+        cacheStatus.className = 'cache-status';
+      }, 3000);
+    }
+  });
 
   // ── Load domain prompts ───────────────────────────────────────────
 
@@ -212,6 +256,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       openCodeZenModel: ocZenModelInput.value || 'deepseek-v4-flash-free',
       targetLanguage: targetLangInput.value.trim() || 'Spanish',
       autoTranslate: autoTranslateCheck.checked,
+      cacheEnabled: cacheEnabledCheck.checked,
     };
 
     try {
@@ -363,5 +408,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Init ──────────────────────────────────────────────────────────
 
   await loadSettings();
+  await loadCacheStats();
   await loadAllSections();
 });

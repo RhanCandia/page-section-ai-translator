@@ -1,5 +1,5 @@
 // Content script for Page Section AI Translator
-// Handles: pick mode (section selection) + auto-translation on page load.
+// Handles: pick mode (section selection) + auto-translation on page load + token-efficient DOM text translation.
 
 // ── State ────────────────────────────────────────────────────────────
 
@@ -11,6 +11,9 @@ const toastId = 'ai-translator-toast';
 // Per-section translation status, keyed by selector
 // Values: 'translated' | 'failed' | 'not-found' | 'skipped'
 const translationStatus = {};
+
+// Cache original untranslated extraction data per element
+const originalDataMap = new WeakMap();
 
 // ── CSS injection ────────────────────────────────────────────────────
 
@@ -128,7 +131,6 @@ function showToast(msg, isError = false) {
 // ── Selector generation ─────────────────────────────────────────────
 
 function generateSelector(el) {
-  // Use ID if available — globally unique
   if (el.id && document.querySelectorAll(`#${CSS.escape(el.id)}`).length === 1) {
     return `#${CSS.escape(el.id)}`;
   }
@@ -139,14 +141,12 @@ function generateSelector(el) {
   while (current && current !== document.body && current !== document.documentElement) {
     let seg = current.tagName.toLowerCase();
 
-    // ID is unique — anchor here
     if (current.id && document.querySelectorAll(`#${CSS.escape(current.id)}`).length === 1) {
       seg = `#${CSS.escape(current.id)}`;
       parts.unshift(seg);
       break;
     }
 
-    // Add relevant classes (skip auto-generated/injected ones)
     const stableClasses = Array.from(current.classList).filter(
       c => !/^ai-translator-/.test(c) && !/^[a-z]+-[a-f0-9]{4,}$/i.test(c) && c.length > 1
     );
@@ -154,7 +154,6 @@ function generateSelector(el) {
       seg += '.' + stableClasses.map(c => CSS.escape(c)).join('.');
     }
 
-    // nth-child disambiguation only when needed
     const parent = current.parentElement;
     if (parent) {
       const siblings = Array.from(parent.children).filter(
@@ -163,11 +162,9 @@ function generateSelector(el) {
       const allSiblings = Array.from(parent.children);
       const sameTagIndex = siblings.indexOf(current);
       if (sameTagIndex === -1) {
-        // Shouldn't happen, fallback to all-children index
         const allIndex = allSiblings.indexOf(current);
         seg += `:nth-child(${allIndex + 1})`;
       } else if (siblings.length > 1) {
-        // Use nth-child with all-children index for accuracy
         const allIndex = allSiblings.indexOf(current);
         seg += `:nth-child(${allIndex + 1})`;
       }
@@ -249,10 +246,8 @@ async function onClick(e) {
 
   const el = e.target;
 
-  // Don't pick the overlay/toast elements
   if (el.closest(`#${overlayId}`) || el.closest(`#${toastId}`)) return;
 
-  // Remove hover highlight so it doesn't get baked into the saved selector
   el.classList.remove('ai-translator-highlight');
 
   const selector = generateSelector(el);
@@ -267,7 +262,6 @@ async function onClick(e) {
 
   exitPickMode();
 
-  // Save section via background
   let response;
   try {
     response = await chrome.runtime.sendMessage({
@@ -284,15 +278,192 @@ async function onClick(e) {
     return;
   }
 
-  // Visual confirmation
   el.classList.add('ai-translator-selected');
   showToast(`Section saved for "${domain}"`);
   setTimeout(() => el.classList.remove('ai-translator-selected'), 2000);
 }
 
+// ── DOM Text Extraction & Mapping (Token Optimization) ────────────────
+
+const INLINE_TAGS = new Set([
+  'A', 'ABBR', 'B', 'BDI', 'BDO', 'BR', 'CITE', 'CODE', 'DATA',
+  'DFN', 'EM', 'I', 'KBD', 'MARK', 'Q', 'RP', 'RT', 'RUBY',
+  'S', 'SAMP', 'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TIME',
+  'U', 'VAR', 'WBR'
+]);
+
+const IGNORE_TAGS = new Set([
+  'SCRIPT', 'STYLE', 'SVG', 'NOSCRIPT', 'CANVAS', 'VIDEO',
+  'AUDIO', 'IFRAME', 'OBJECT', 'TEMPLATE'
+]);
+
+function isVisible(el) {
+  if (el.nodeType === Node.ELEMENT_NODE) {
+    if (IGNORE_TAGS.has(el.tagName)) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+  }
+  return true;
+}
+
+// Check if element has only phrasing / text children (no nested blocks)
+function isPhrasingContainer(el) {
+  if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+  if (IGNORE_TAGS.has(el.tagName)) return false;
+
+  for (const child of el.children) {
+    if (IGNORE_TAGS.has(child.tagName)) continue;
+    if (!INLINE_TAGS.has(child.tagName)) return false;
+    if (!isPhrasingContainer(child)) return false;
+  }
+  return true;
+}
+
+// Build serialized placeholder string for a phrasing container
+function serializePhrasingContainer(containerEl) {
+  const inlineNodes = [];
+  let nextId = 0;
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.nodeValue;
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (IGNORE_TAGS.has(node.tagName) || !isVisible(node)) return '';
+      const id = nextId++;
+      inlineNodes[id] = node;
+      let innerText = '';
+      for (const child of node.childNodes) {
+        innerText += walk(child);
+      }
+      return `[${id}]${innerText}[/${id}]`;
+    }
+    return '';
+  }
+
+  let text = '';
+  for (const child of containerEl.childNodes) {
+    text += walk(child);
+  }
+
+  return { text, inlineNodes };
+}
+
+// Extract all translatable units from an element tree
+function extractTranslatableUnits(rootEl) {
+  const units = [];
+
+  function traverse(node) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (IGNORE_TAGS.has(node.tagName) || !isVisible(node)) return;
+
+      // If it's a leaf block or phrasing container containing text
+      if (isPhrasingContainer(node)) {
+        const { text, inlineNodes } = serializePhrasingContainer(node);
+        if (text.trim().length > 0) {
+          units.push({
+            type: 'phrasing',
+            element: node,
+            inlineNodes,
+            originalText: text,
+          });
+          return;
+        }
+      }
+
+      // Otherwise traverse children
+      for (const child of node.childNodes) {
+        traverse(child);
+      }
+    } else if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.nodeValue;
+      if (text && text.trim().length > 0) {
+        units.push({
+          type: 'textNode',
+          node,
+          originalText: text,
+        });
+      }
+    }
+  }
+
+  traverse(rootEl);
+  return units;
+}
+
+// Safely reconstruct children of phrasing container using translated string & inline elements
+function applyPhrasingTranslation(containerEl, inlineNodes, translatedStr) {
+  if (!inlineNodes || inlineNodes.length === 0) {
+    containerEl.textContent = translatedStr;
+    return;
+  }
+
+  const tokenRegex = /\[(\d+)\]([\s\S]*?)\[\/\1\]/g;
+  let lastIndex = 0;
+  let match;
+  const newFragment = document.createDocumentFragment();
+  let matchedAll = true;
+
+  try {
+    while ((match = tokenRegex.exec(translatedStr)) !== null) {
+      // Text before match
+      if (match.index > lastIndex) {
+        newFragment.appendChild(
+          document.createTextNode(translatedStr.slice(lastIndex, match.index))
+        );
+      }
+
+      const id = parseInt(match[1], 10);
+      const innerText = match[2];
+      const inlineEl = inlineNodes[id];
+
+      if (inlineEl) {
+        // Strip nested placeholders if any remain inside innerText
+        inlineEl.textContent = innerText.replace(/\[\/?\d+\]/g, '');
+        newFragment.appendChild(inlineEl);
+      } else {
+        newFragment.appendChild(document.createTextNode(innerText));
+      }
+
+      lastIndex = tokenRegex.lastIndex;
+    }
+
+    // Trailing text
+    if (lastIndex < translatedStr.length) {
+      newFragment.appendChild(
+        document.createTextNode(translatedStr.slice(lastIndex))
+      );
+    }
+
+    containerEl.replaceChildren(newFragment);
+  } catch (err) {
+    // Graceful fallback if placeholder parsing encounters unexpected issue
+    console.warn('[AI Translator] Fallback phrasing text replacement:', err);
+    containerEl.textContent = translatedStr.replace(/\[\/?\d+\]/g, '');
+  }
+}
+
+function applyTranslationsToUnits(units, translatedSegments) {
+  for (let i = 0; i < units.length; i++) {
+    const unit = units[i];
+    const translated = translatedSegments[i];
+    if (translated === undefined || translated === null) continue;
+
+    if (unit.type === 'textNode') {
+      if (unit.node && unit.node.parentNode) {
+        unit.node.nodeValue = translated;
+      }
+    } else if (unit.type === 'phrasing') {
+      if (unit.element && unit.element.parentNode) {
+        applyPhrasingTranslation(unit.element, unit.inlineNodes, translated);
+      }
+    }
+  }
+}
+
 // ── Auto-translate on page load ──────────────────────────────────────
 
-async function autoTranslate() {
+async function autoTranslate(force = false) {
   const domain = window.location.hostname;
   if (!domain) return;
 
@@ -316,7 +487,7 @@ async function autoTranslate() {
     console.log('[AI Translator] No saved sections for', domain);
     return;
   }
-  if (!settings?.autoTranslate) {
+  if (!force && !settings?.autoTranslate) {
     console.log('[AI Translator] Auto-translate disabled in settings');
     return;
   }
@@ -333,11 +504,11 @@ async function autoTranslate() {
       translationStatus[sel] = 'not-found';
       continue;
     }
-    if (el.dataset.aiTranslated) {
+    if (!force && el.dataset.aiTranslated) {
       translationStatus[sel] = 'translated';
       continue;
     }
-    el.dataset.aiTranslated = 'true';
+    el.dataset.aiTranslated = 'in-progress';
 
     const tag = el.tagName.toLowerCase();
     if (tag === 'body' || tag === 'html') {
@@ -347,7 +518,6 @@ async function autoTranslate() {
     eligible.push(el);
   }
 
-  // Map eligible elements back to their selectors
   const selByEl = new Map();
   for (const section of sections) {
     const el = findElementSafe(section.selector);
@@ -359,13 +529,13 @@ async function autoTranslate() {
   for (let i = 0; i < eligible.length; i += BATCH) {
     const batch = eligible.slice(i, i + BATCH);
     const results = await Promise.allSettled(
-      batch.map(el => translateElement(el, settings))
+      batch.map(el => translateElement(el, settings, force))
     );
     for (let j = 0; j < results.length; j++) {
       const r = results[j];
       const el = batch[j];
       const sel = selByEl.get(el);
-      // Only count as translated if the element's content was actually replaced
+
       if (el.dataset.aiTranslated === settings.targetLanguage) {
         translationStatus[sel] = 'translated';
         translated++;
@@ -380,7 +550,7 @@ async function autoTranslate() {
   }
 
   if (translated > 0) {
-    showToast(`Translated ${translated} section(s) on ${domain}`);
+    showToast(`${force ? 'Re-translated' : 'Translated'} ${translated} section(s) on ${domain}`);
   }
 }
 
@@ -392,34 +562,30 @@ function findElementSafe(selector) {
   }
 }
 
-async function translateElement(el, settings) {
-  let originalHtml = el.innerHTML;
-  if (!originalHtml.trim()) return;
+async function translateElement(el, settings, force = false) {
+  let unitsData = originalDataMap.get(el);
 
-  // Cap HTML size to avoid slow API calls and message size limits
-  const MAX_HTML_SIZE = 50000;
-  if (originalHtml.length > MAX_HTML_SIZE) {
-    console.warn(
-      `[AI Translator] Section HTML is ${originalHtml.length} chars, truncating to ~${MAX_HTML_SIZE}`
-    );
-    // Truncate at the last closing angle bracket before the limit
-    const truncated = originalHtml.slice(0, MAX_HTML_SIZE);
-    const lastClose = truncated.lastIndexOf('>');
-    originalHtml = lastClose > MAX_HTML_SIZE * 0.8
-      ? truncated.slice(0, lastClose + 1)
-      : truncated;
+  // Extract units if not previously cached or if forced from fresh DOM
+  if (!unitsData || (!force && !el.dataset.aiTranslated)) {
+    const units = extractTranslatableUnits(el);
+    const segments = units.map(u => u.originalText);
+    unitsData = { units, segments };
+    originalDataMap.set(el, unitsData);
   }
 
-  // Show thin progress bar at top of element while waiting
+  const { units, segments } = unitsData;
+  if (!segments || segments.length === 0) return;
+
   el.classList.add('ai-translator-translating');
 
   let response;
   try {
     response = await chrome.runtime.sendMessage({
       action: 'translate',
-      html: originalHtml,
+      segments,
       domain: window.location.hostname,
       targetLanguage: settings.targetLanguage,
+      forceReTranslate: force,
     });
   } catch (err) {
     console.error('[AI Translator] Translation request failed:', err);
@@ -434,12 +600,13 @@ async function translateElement(el, settings) {
     throw new Error(response.error);
   }
 
-  if (!response?.translated || response.translated === originalHtml) {
-    return; // nothing changed, keep original
+  const translatedSegments = response?.translatedSegments;
+  if (!Array.isArray(translatedSegments) || translatedSegments.length === 0) {
+    return;
   }
 
-  // Replace all content at once, then stagger-reveal children
-  el.innerHTML = response.translated;
+  // Apply translations directly onto DOM text units
+  applyTranslationsToUnits(units, translatedSegments);
   el.dataset.aiTranslated = settings.targetLanguage;
 
   staggerRevealChildren(el);
@@ -449,17 +616,15 @@ function staggerRevealChildren(el) {
   const children = el.children;
   if (!children.length) return;
 
-  // Set all children invisible first so they don't flash before animation kicks in
   for (let i = 0; i < children.length; i++) {
     children[i].style.opacity = '0';
   }
 
-  // Start stagger on the next frame so opacity:0 renders before animation begins
   requestAnimationFrame(() => {
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
       child.classList.add('ai-tr-stagger');
-      child.style.animationDelay = `${i * 120}ms`;
+      child.style.animationDelay = `${i * 80}ms`;
     }
   });
 }
@@ -475,21 +640,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ ok: true });
   } else if (request.action === 'getTranslationStatus') {
     sendResponse({ status: { ...translationStatus } });
+  } else if (request.action === 'forceReTranslate') {
+    autoTranslate(true).then(() => {
+      sendResponse({ ok: true });
+    }).catch(err => {
+      sendResponse({ error: err.message });
+    });
+    return true;
   } else {
-    return false; // not handled
+    return false;
   }
-  return true; // keep channel open for sendResponse
+  return true;
 });
 
 // ── Initialization ──────────────────────────────────────────────────
 
 injectStyles();
 
-// Run auto-translate after a short delay to let page fully render
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(autoTranslate, 500);
+    setTimeout(() => autoTranslate(false), 500);
   });
 } else {
-  setTimeout(autoTranslate, 500);
+  setTimeout(() => autoTranslate(false), 500);
 }

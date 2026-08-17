@@ -123,10 +123,26 @@ select:focus {
   cursor: pointer;
   font-size: 14px;
   white-space: nowrap;
+  transition: all 0.15s ease;
 }
 
 .small-btn:hover {
   background: #e8eaed;
+}
+
+.danger-btn {
+  background: #fce8e6;
+  border-color: #f5c6cb;
+  color: #ea4335;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.danger-btn:hover {
+  background: #ea4335;
+  color: #fff;
+  border-color: #ea4335;
 }
 
 /* ── Checkbox ──────────────────────────────────────────────────── */
@@ -146,6 +162,38 @@ select:focus {
   width: 16px;
   height: 16px;
   cursor: pointer;
+}
+
+/* ── Cache Stats ───────────────────────────────────────────────── */
+
+.cache-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fafbfc;
+  border: 1px solid #e8eaed;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 12px;
+}
+
+#cache-stats-label {
+  font-size: 13px;
+  color: #5f6368;
+}
+
+.cache-status {
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.cache-status.success {
+  color: #34a853;
+}
+
+.cache-status.error {
+  color: #ea4335;
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */

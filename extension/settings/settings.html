@@ -110,6 +110,25 @@
       </div>
     </section>
 
+    <!-- Translation Cache -->
+    <section id="cache-settings">
+      <h2>Translation Cache</h2>
+      <p class="hint" style="margin-bottom: 14px">
+        Cached translations prevent repeated API requests when visiting the same sections, reducing token usage and speeding up page loads.
+      </p>
+
+      <div class="field checkbox-row">
+        <input type="checkbox" id="cache-enabled" />
+        <label for="cache-enabled">Enable response caching</label>
+      </div>
+
+      <div class="cache-stats-row">
+        <span id="cache-stats-label">Checking cache stats...</span>
+        <button id="clear-cache-btn" class="small-btn danger-btn">Clear Cache</button>
+      </div>
+      <span id="cache-status" class="cache-status"></span>
+    </section>
+
     <!-- Domain Management -->
     <section>
       <h2>Domains &amp; Custom Instructions</h2>
