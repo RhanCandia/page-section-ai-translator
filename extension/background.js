@@ -4,10 +4,10 @@
 const DEFAULT_SETTINGS = {
   provider: 'gemini',
   geminiApiKey: '',
-  geminiModel: 'gemini-2.0-flash',
+  geminiModel: 'gemini-2.5-flash',
   openCodeZenApiKey: '',
   openCodeZenModel: 'deepseek-v4-flash-free',
-  targetLanguage: 'Spanish',
+  targetLanguage: 'English',
   autoTranslate: true,
   cacheEnabled: true,
 };

@@ -40,10 +40,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleProviderSections(providerSelect.value);
 
     geminiApiKeyInput.value = settings.geminiApiKey || '';
-    geminiModelInput.value = settings.geminiModel || 'gemini-2.0-flash';
+    geminiModelInput.value = settings.geminiModel || 'gemini-2.5-flash';
     ocZenApiKeyInput.value = settings.openCodeZenApiKey || '';
     ocZenModelInput.value = settings.openCodeZenModel || 'deepseek-v4-flash-free';
-    targetLangInput.value = settings.targetLanguage || 'Spanish';
+    targetLangInput.value = settings.targetLanguage || 'English';
     autoTranslateCheck.checked = settings.autoTranslate !== false;
     cacheEnabledCheck.checked = settings.cacheEnabled !== false;
   }
@@ -251,10 +251,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settings = {
       provider: providerSelect.value,
       geminiApiKey: geminiApiKeyInput.value.trim(),
-      geminiModel: geminiModelInput.value || 'gemini-2.0-flash',
+      geminiModel: geminiModelInput.value || 'gemini-2.5-flash',
       openCodeZenApiKey: ocZenApiKeyInput.value.trim(),
       openCodeZenModel: ocZenModelInput.value || 'deepseek-v4-flash-free',
-      targetLanguage: targetLangInput.value.trim() || 'Spanish',
+      targetLanguage: targetLangInput.value.trim() || 'English',
       autoTranslate: autoTranslateCheck.checked,
       cacheEnabled: cacheEnabledCheck.checked,
     };
@@ -292,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         testStatus.className = 'error';
         return;
       }
-      const model = geminiModelInput.value || 'gemini-2.0-flash';
+      const model = geminiModelInput.value || 'gemini-2.5-flash';
       testStatus.textContent = 'Testing Gemini key...';
       testStatus.className = '';
 
