@@ -2,6 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   const domainLabel = document.getElementById('domain-label');
+  const activeModelBadge = document.getElementById('active-model-badge');
   const pickBtn = document.getElementById('pick-section');
   const retranslateBtn = document.getElementById('retranslate-btn');
   const settingsBtn = document.getElementById('settings-btn');
@@ -30,6 +31,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     domainLabel.textContent = 'Error reading page';
     setStatus('Cannot access this page', 'error');
     return;
+  }
+
+  // ── Load Active Config Badge for Domain ─────────────────────────
+
+  async function loadActiveModelBadge() {
+    if (!currentDomain || !activeModelBadge) return;
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        action: 'getActiveConfigForDomain',
+        domain: currentDomain,
+      });
+
+      if (resp && resp.effectiveModel) {
+        const provLabel = resp.effectiveProvider === 'opencode-zen' ? 'Zen' : 'Gemini';
+        const isOverride = resp.isProviderOverridden || resp.isModelOverridden;
+        activeModelBadge.textContent = `${provLabel}: ${resp.effectiveModel}${isOverride ? ' • Override' : ''}`;
+        if (isOverride) {
+          activeModelBadge.classList.add('override');
+          activeModelBadge.title = 'Domain override active';
+        } else {
+          activeModelBadge.classList.remove('override');
+          activeModelBadge.title = 'Global default active';
+        }
+      }
+    } catch {
+      // Background message error fallback
+    }
   }
 
   // ── Load sections for domain ────────────────────────────────────
@@ -100,6 +128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  await loadActiveModelBadge();
   await loadSections();
 
   // ── Pick section ────────────────────────────────────────────────
@@ -166,7 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // ── Settings & Links ────────────────────────────────────────────
+  // ── Settings & Links ────────────────────────────────────
 
   settingsBtn.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();

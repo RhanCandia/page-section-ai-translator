@@ -12,84 +12,85 @@
       <h1>AI Translator Settings</h1>
     </header>
 
-    <!-- Provider -->
+    <!-- Global Provider & Models -->
     <section>
-      <h2>Provider</h2>
+      <h2>Default (Global) AI Provider &amp; Models</h2>
       <div class="field">
-        <label for="provider">AI Provider</label>
+        <label for="provider">Default AI Provider</label>
         <select id="provider">
           <option value="gemini">Google Gemini</option>
           <option value="opencode-zen">OpenCode Zen</option>
         </select>
+        <p class="hint">The fallback provider used for all domains unless overridden.</p>
+      </div>
+
+      <div class="field-grid">
+        <div class="field">
+          <label for="gemini-model">Default Gemini Model</label>
+          <input type="text" id="gemini-model" list="gemini-model-suggestions" placeholder="gemini-2.5-flash" />
+        </div>
+        <div class="field">
+          <label for="oc-zen-model">Default OpenCode Zen Model</label>
+          <input type="text" id="oc-zen-model" list="oc-zen-model-suggestions" placeholder="deepseek-v4-flash-free" />
+        </div>
       </div>
     </section>
 
-    <!-- Gemini -->
-    <section id="gemini-settings" class="provider-section" data-provider="gemini">
-      <h2>Gemini Configuration</h2>
+    <!-- Reusable Model Datalists -->
+    <datalist id="gemini-model-suggestions">
+      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+      <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+      <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
+      <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+      <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
+    </datalist>
 
-      <div class="field">
-        <label for="gemini-api-key">API Key</label>
+    <datalist id="oc-zen-model-suggestions">
+      <option value="deepseek-v4-flash-free">DeepSeek V4 Flash Free</option>
+      <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
+      <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
+      <option value="big-pickle">Big Pickle (Free)</option>
+      <option value="mimo-v2.5-free">MiMo V2.5 Free</option>
+      <option value="ling-3.0-flash-free">Ling 3.0 Flash Free</option>
+      <option value="qwen3.7-plus">Qwen 3.7 Plus</option>
+      <option value="qwen3.7-max">Qwen 3.7 Max</option>
+      <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
+      <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
+    </datalist>
+
+    <!-- Dedicated API Keys Section -->
+    <section id="api-keys-section">
+      <h2>API Keys</h2>
+      <p class="hint" style="margin-bottom: 14px;">
+        Configure keys for the providers you use. Keys are optional until a provider is selected globally or as a per-domain override.
+      </p>
+
+      <!-- Gemini Key -->
+      <div class="api-key-block">
+        <div class="api-key-header">
+          <label for="gemini-api-key">Google Gemini API Key</label>
+          <a href="https://aistudio.google.com/apikey" target="_blank" class="key-link">Get key &#x2197;</a>
+        </div>
         <div class="input-row">
           <input type="password" id="gemini-api-key" placeholder="Enter your Gemini API key" />
           <button id="toggle-gemini-key" class="small-btn" title="Show/Hide key">&#128065;</button>
+          <button id="test-gemini-btn" class="small-btn test-key-btn">Test Key</button>
         </div>
-        <p class="hint">
-          Get a key from
-          <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>.
-        </p>
+        <span id="test-gemini-status" class="test-key-status"></span>
       </div>
 
-      <div class="field">
-        <label for="gemini-model">Model</label>
-        <input type="text" id="gemini-model" list="gemini-model-suggestions" placeholder="gemini-2.5-flash" />
-        <datalist id="gemini-model-suggestions">
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-          <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-          <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
-          <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
-          <option value="gemini-3.7-flash">Gemini 3.7 Flash</option>
-        </datalist>
-        <p class="hint">Type any model name or pick from suggestions.</p>
-      </div>
-    </section>
-
-    <!-- OpenCode Zen -->
-    <section id="opencode-zen-settings" class="provider-section" data-provider="opencode-zen" style="display:none">
-      <h2>OpenCode Zen Configuration</h2>
-
-      <div class="field">
-        <label for="oc-zen-api-key">API Key</label>
+      <!-- OpenCode Zen Key -->
+      <div class="api-key-block">
+        <div class="api-key-header">
+          <label for="oc-zen-api-key">OpenCode Zen API Key</label>
+          <a href="https://opencode.ai/auth" target="_blank" class="key-link">Get key (free) &#x2197;</a>
+        </div>
         <div class="input-row">
           <input type="password" id="oc-zen-api-key" placeholder="Enter your OpenCode Zen API key" />
           <button id="toggle-oc-zen-key" class="small-btn" title="Show/Hide key">&#128065;</button>
+          <button id="test-oc-zen-btn" class="small-btn test-key-btn">Test Key</button>
         </div>
-        <p class="hint">
-          Get a key from
-          <a href="https://opencode.ai/auth" target="_blank">opencode.ai/auth</a>.
-          Free models like <code>deepseek-v4-flash-free</code> require no billing.
-        </p>
-      </div>
-
-      <div class="field">
-        <label for="oc-zen-model">Model</label>
-        <input type="text" id="oc-zen-model" list="oc-zen-model-suggestions" placeholder="deepseek-v4-flash-free" />
-        <datalist id="oc-zen-model-suggestions">
-          <option value="deepseek-v4-flash-free">DeepSeek V4 Flash Free</option>
-          <option value="deepseek-v4-flash">DeepSeek V4 Flash</option>
-          <option value="deepseek-v4-pro">DeepSeek V4 Pro</option>
-          <option value="big-pickle">Big Pickle (Free)</option>
-          <option value="mimo-v2.5-free">MiMo V2.5 Free</option>
-          <option value="ling-3.0-flash-free">Ling 3.0 Flash Free</option>
-          <option value="qwen3.7-plus">Qwen 3.7 Plus</option>
-          <option value="qwen3.7-max">Qwen 3.7 Max</option>
-          <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
-          <option value="claude-haiku-4.5">Claude Haiku 4.5</option>
-        </datalist>
-        <p class="hint">
-          Type any model ID or pick from suggestions.
-          <a href="https://opencode.ai/docs/zen/#endpoints" target="_blank">Full model list</a>.
-        </p>
+        <span id="test-oc-zen-status" class="test-key-status"></span>
       </div>
     </section>
 
@@ -128,10 +129,12 @@
       <span id="cache-status" class="cache-status"></span>
     </section>
 
-    <!-- Domain Management -->
+    <!-- Domain Management & Overrides -->
     <section>
-      <h2>Domains &amp; Custom Instructions</h2>
-      <p class="hint" style="margin-bottom:12px">Add per-domain instructions to control translation style, tone, or terminology.</p>
+      <h2>Domains &amp; Overrides</h2>
+      <p class="hint" style="margin-bottom: 12px">
+        Configure per-domain provider, model overrides, and custom translation instructions.
+      </p>
       <div id="all-sections-list">
         <p class="empty-state">No sections saved yet. Open a page and use "Pick Section" from the extension popup.</p>
       </div>
@@ -139,10 +142,8 @@
 
     <!-- Actions -->
     <section class="actions">
-      <button id="save-btn" class="btn-primary">Save Settings</button>
-      <button id="test-btn" class="btn-secondary">Test API Key</button>
+      <button id="save-btn" class="btn-primary">Save Global Settings</button>
       <span id="save-status"></span>
-      <span id="test-status"></span>
     </section>
 
     <!-- Support -->

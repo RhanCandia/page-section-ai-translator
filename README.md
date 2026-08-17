@@ -12,6 +12,10 @@ A Chrome extension that lets you pick any section of a webpage, save it by domai
 
 **Token-Efficient Translation** — Extracts and sends only visible text segments with compact inline placeholders (`[0]...[/0]`) instead of raw HTML with nested tags, attributes, class names, styles, and SVGs. This cuts token consumption by 70–90% and keeps styles and event listeners completely intact.
 
+**Per-Domain Provider & Model Overrides** — Use Gemini globally while overriding specific domains to OpenCode Zen (or vice versa), and set custom model IDs per domain (e.g. `gemini-3.7-flash` or `qwen3.7-plus`).
+
+**Dedicated API Keys Section** — Enter and test API keys for Google Gemini and OpenCode Zen independently in Settings.
+
 **Local Response Caching** — Stores translated strings locally in `chrome.storage.local`. Repeated page loads or visits to the same page fetch translations instantly with **0 API tokens used**.
 
 **Force Re-translate** — Click the "Re-translate" button in the popup to bypass the cache on demand and fetch a fresh translation from the AI provider.
@@ -22,9 +26,7 @@ A Chrome extension that lets you pick any section of a webpage, save it by domai
 
 **Per-domain custom instructions** — Set translation style, tone, or rules per domain in Settings. Prompts are injected into the API call alongside the text. Ideal for controlling honorifics, censorship, terminology, or formality.
 
-**Multiple providers** — Switch between Google Gemini and OpenCode Zen in Settings. Each has its own API key and model field with relevant suggestions.
-
-**Status indicators** — The popup shows per-section status at a glance: pastel green (translated), red (failed), yellow (not found on page).
+**Status & Active Model Badge** — The popup displays the active provider and model for the page (highlighting domain overrides) and per-section status indicators.
 
 ## How to install
 
@@ -41,9 +43,8 @@ The extension icon appears in the toolbar.
 
 Right-click the extension icon -> **Options** (or click the gear icon in the popup).
 
-**Google Gemini** — Pick "Google Gemini" as the provider. Enter your API key from [Google AI Studio](https://aistudio.google.com/apikey) and select a model. Click **Test API Key** to verify.
-
-**OpenCode Zen** — Pick "OpenCode Zen" as the provider. Get a key from [opencode.ai/auth](https://opencode.ai/auth). Free models like `deepseek-v4-flash-free` require no billing. Enter the key and model ID, then test.
+- **Default Provider & Models**: Choose your global default provider and default models.
+- **API Keys**: Enter your API key for Google Gemini ([Google AI Studio](https://aistudio.google.com/apikey)) and/or OpenCode Zen ([opencode.ai/auth](https://opencode.ai/auth)). Click **Test Key** to verify.
 
 ### 2. Pick a section
 
@@ -53,47 +54,34 @@ Navigate to any page, click the extension icon, then **Pick Section**. Hover ove
 
 Reload the page. The section gets a pulsing border while the AI translates it, then the translated content fades in. Subsequent visits load instantly from cache!
 
-### 4. Custom instructions per domain (optional)
+### 4. Per-domain overrides & custom instructions (optional)
 
-In Settings -> Domains & Custom Instructions, each domain with saved sections has a textarea. Add instructions like:
-
-> Use formal tone, keep proper nouns untranslated, use British English spelling.
-
-Click **Save**. All future translations for that domain will include your prompt.
+In Settings -> Domains & Overrides, each domain card allows:
+- Overriding the **AI Provider** (e.g. switch to OpenCode Zen for this domain).
+- Overriding the **AI Model** (e.g. use `gemini-3.7-flash` or `deepseek-v4-flash-free`).
+- Adding custom translation instructions (e.g. `Use formal tone, keep proper nouns untranslated`).
 
 ## Architecture
 
 ```
 extension/
   manifest.json        # MV3 manifest
-  background.js        # Service worker: message router, AI API proxy, response caching, storage
+  background.js        # Service worker: message router, AI API proxy, response caching, domain configs
   content.js           # Injected script: pick mode, DOM text extraction, auto-translate, stagger reveal
   popup/
-    popup.html/.js/.css    # Quick actions: Pick Section, Re-translate, list saved for domain
+    popup.html/.js/.css    # Quick actions: Pick Section, Re-translate, active model badge, saved sections
   settings/
-    settings.html/.js/.css # API key, model, language, domain prompts, cache management, manage sections
+    settings.html/.js/.css # Provider defaults, API keys, language, domain overrides & prompts, cache management
   icons/
-```
-
-### Flow
-
-```
-Page loads -> content.js checks storage for matching domain sections
-           -> content.js extracts visible text segments and inline placeholders ([0]...[/0])
-           -> background.js checks translationCache (returns instantly if cached)
-           -> If uncached or force-retranslating, background.js calls selected provider API
-           -> Translations are saved to local cache (with LRU eviction)
-           -> content.js applies translations directly to DOM text nodes without breaking HTML
-           -> On error, original content is untouched (never removed)
 ```
 
 ### Data model
 
 Storage keys in `chrome.storage.local`:
 
-- `settings` — Provider, API keys, model, target language, auto-translate toggle, cacheEnabled
+- `settings` — Global provider, API keys, default models, target language, auto-translate toggle, cacheEnabled
 - `savedSections` — Array of `{ id, domain, selector, label, createdAt }`
-- `domainPrompts` — Object mapping `domain -> custom instruction string`
+- `domainConfigs` — Object mapping `domain -> { provider, model, prompt }`
 - `translationCache` — Object mapping hash keys to `{ original, translated, lastAccessed }`
 
 ## Supported providers
@@ -103,15 +91,11 @@ Storage keys in `chrome.storage.local`:
 | Google Gemini | `generateContent` | `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
 | OpenCode Zen | OpenAI-compatible chat completions | `https://opencode.ai/zen/v1/chat/completions` |
 
-The background message dispatcher routes to the selected provider. Adding a new provider means adding a `translateWithXxx` function and a new option in the provider dropdown.
-
 ### Free OpenCode Zen models
 
 - `deepseek-v4-flash-free` — DeepSeek V4 Flash (limited time)
 - `big-pickle` — Free, no billing needed
 - `mimo-v2.5-free`, `ling-3.0-flash-free`, `nemotron-3-ultra-free`
-
-Paid models like `deepseek-v4-flash` or `claude-sonnet-4.6` are faster and have no timeouts.
 
 ## Support & Donation
 

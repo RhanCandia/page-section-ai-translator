@@ -4,12 +4,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── DOM refs ──────────────────────────────────────────────────────
 
   const providerSelect = document.getElementById('provider');
-  const geminiApiKeyInput = document.getElementById('gemini-api-key');
   const geminiModelInput = document.getElementById('gemini-model');
-  const toggleGeminiKeyBtn = document.getElementById('toggle-gemini-key');
-  const ocZenApiKeyInput = document.getElementById('oc-zen-api-key');
   const ocZenModelInput = document.getElementById('oc-zen-model');
+  const geminiApiKeyInput = document.getElementById('gemini-api-key');
+  const ocZenApiKeyInput = document.getElementById('oc-zen-api-key');
+  const toggleGeminiKeyBtn = document.getElementById('toggle-gemini-key');
   const toggleOcZenKeyBtn = document.getElementById('toggle-oc-zen-key');
+  const testGeminiBtn = document.getElementById('test-gemini-btn');
+  const testGeminiStatus = document.getElementById('test-gemini-status');
+  const testOcZenBtn = document.getElementById('test-oc-zen-btn');
+  const testOcZenStatus = document.getElementById('test-oc-zen-status');
   const targetLangInput = document.getElementById('target-lang');
   const autoTranslateCheck = document.getElementById('auto-translate');
   const cacheEnabledCheck = document.getElementById('cache-enabled');
@@ -18,31 +22,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cacheStatus = document.getElementById('cache-status');
   const saveBtn = document.getElementById('save-btn');
   const saveStatus = document.getElementById('save-status');
-  const testBtn = document.getElementById('test-btn');
-  const testStatus = document.getElementById('test-status');
   const allSectionsList = document.getElementById('all-sections-list');
 
-  // ── Show/hide provider sections ──────────────────────────────────
-
-  function toggleProviderSections(provider) {
-    document.querySelectorAll('.provider-section').forEach(el => {
-      el.style.display = el.dataset.provider === provider ? '' : 'none';
-    });
-  }
+  let currentSettings = {};
+  let domainConfigsCache = {};
 
   // ── Load settings ─────────────────────────────────────────────────
 
   async function loadSettings() {
     const { settings } = await chrome.runtime.sendMessage({ action: 'getSettings' });
     if (!settings) return;
+    currentSettings = settings;
 
     providerSelect.value = settings.provider || 'gemini';
-    toggleProviderSections(providerSelect.value);
-
-    geminiApiKeyInput.value = settings.geminiApiKey || '';
     geminiModelInput.value = settings.geminiModel || 'gemini-2.5-flash';
-    ocZenApiKeyInput.value = settings.openCodeZenApiKey || '';
     ocZenModelInput.value = settings.openCodeZenModel || 'deepseek-v4-flash-free';
+    geminiApiKeyInput.value = settings.geminiApiKey || '';
+    ocZenApiKeyInput.value = settings.openCodeZenApiKey || '';
     targetLangInput.value = settings.targetLanguage || 'English';
     autoTranslateCheck.checked = settings.autoTranslate !== false;
     cacheEnabledCheck.checked = settings.cacheEnabled !== false;
@@ -87,32 +83,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ── Load domain prompts ───────────────────────────────────────────
+  // ── Load domain configs ───────────────────────────────────────────
 
-  let domainPromptsCache = {};
-
-  async function loadDomainPrompts() {
-    const { domainPrompts } = await chrome.runtime.sendMessage({ action: 'getDomainPrompts' });
-    domainPromptsCache = domainPrompts || {};
-    return domainPromptsCache;
+  async function loadDomainConfigs() {
+    const { domainConfigs } = await chrome.runtime.sendMessage({ action: 'getDomainConfigs' });
+    domainConfigsCache = domainConfigs || {};
+    return domainConfigsCache;
   }
 
-  async function saveDomainPrompt(domain, prompt) {
-    domainPromptsCache[domain] = prompt;
-    const { domainPrompts } = await chrome.runtime.sendMessage({
-      action: 'setDomainPrompt',
+  async function saveDomainConfig(domain, config) {
+    domainConfigsCache[domain] = config;
+    const { domainConfigs } = await chrome.runtime.sendMessage({
+      action: 'setDomainConfig',
       domain,
-      prompt,
+      config,
     });
-    domainPromptsCache = domainPrompts;
+    domainConfigsCache = domainConfigs;
   }
 
   // ── Load sections (grouped by domain) ─────────────────────────────
 
   async function loadAllSections() {
-    const [savedSections, domainPrompts] = await Promise.all([
+    const [savedSections, domainConfigs] = await Promise.all([
       chrome.storage.local.get('savedSections').then(r => r.savedSections || []),
-      loadDomainPrompts(),
+      loadDomainConfigs(),
     ]);
 
     allSectionsList.innerHTML = '';
@@ -133,12 +127,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     const domains = Object.keys(byDomain).sort();
 
     for (const domain of domains) {
-      const card = buildDomainCard(domain, byDomain[domain], domainPrompts[domain] || '');
+      const card = buildDomainCard(domain, byDomain[domain], domainConfigs[domain] || {});
       allSectionsList.appendChild(card);
     }
   }
 
-  function buildDomainCard(domain, sections, currentPrompt) {
+  function getGlobalProviderLabel() {
+    return providerSelect.value === 'opencode-zen' ? 'OpenCode Zen' : 'Google Gemini';
+  }
+
+  function getDefaultModelForProvider(provider) {
+    if (provider === 'opencode-zen') {
+      return ocZenModelInput.value.trim() || 'deepseek-v4-flash-free';
+    }
+    return geminiModelInput.value.trim() || 'gemini-2.5-flash';
+  }
+
+  function hasKeyForProvider(provider) {
+    if (provider === 'opencode-zen') {
+      return Boolean(ocZenApiKeyInput.value.trim());
+    }
+    return Boolean(geminiApiKeyInput.value.trim());
+  }
+
+  function buildDomainCard(domain, sections, currentConfig) {
     const card = document.createElement('div');
     card.className = 'domain-card';
 
@@ -196,40 +208,121 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     card.appendChild(list);
 
-    // ── Prompt editor ─────────────────────────────────────────────
-    const promptGroup = document.createElement('div');
-    promptGroup.className = 'domain-prompt-group';
+    // ── Domain Overrides Block ─────────────────────────────────────
+    const overridesBlock = document.createElement('div');
+    overridesBlock.className = 'domain-overrides-block';
 
+    const overrideGrid = document.createElement('div');
+    overrideGrid.className = 'domain-override-grid';
+
+    // Provider override select
+    const providerItem = document.createElement('div');
+    providerItem.className = 'domain-override-item';
+    const providerLabel = document.createElement('label');
+    providerLabel.textContent = 'Provider Override';
+    const domainProviderSelect = document.createElement('select');
+
+    const optDefault = document.createElement('option');
+    optDefault.value = 'default';
+    optDefault.textContent = `Default (${getGlobalProviderLabel()})`;
+
+    const optGemini = document.createElement('option');
+    optGemini.value = 'gemini';
+    optGemini.textContent = 'Google Gemini';
+
+    const optZen = document.createElement('option');
+    optZen.value = 'opencode-zen';
+    optZen.textContent = 'OpenCode Zen';
+
+    domainProviderSelect.appendChild(optDefault);
+    domainProviderSelect.appendChild(optGemini);
+    domainProviderSelect.appendChild(optZen);
+    domainProviderSelect.value = currentConfig.provider || 'default';
+
+    providerItem.appendChild(providerLabel);
+    providerItem.appendChild(domainProviderSelect);
+    overrideGrid.appendChild(providerItem);
+
+    // Model override input
+    const modelItem = document.createElement('div');
+    modelItem.className = 'domain-override-item';
+    const modelLabel = document.createElement('label');
+    modelLabel.textContent = 'Model Override';
+    const domainModelInput = document.createElement('input');
+    domainModelInput.type = 'text';
+    domainModelInput.value = currentConfig.model || '';
+    modelItem.appendChild(modelLabel);
+    modelItem.appendChild(domainModelInput);
+    overrideGrid.appendChild(modelItem);
+
+    overridesBlock.appendChild(overrideGrid);
+
+    // Key warning badge
+    const warningBadge = document.createElement('div');
+    warningBadge.className = 'key-warning-badge';
+    warningBadge.style.display = 'none';
+    overridesBlock.appendChild(warningBadge);
+
+    function updateModelFieldState() {
+      const selectedProv = domainProviderSelect.value;
+      const effectiveProv = selectedProv === 'default' ? providerSelect.value : selectedProv;
+      const defaultModel = getDefaultModelForProvider(effectiveProv);
+
+      domainModelInput.placeholder = `Default (${defaultModel})`;
+      domainModelInput.setAttribute(
+        'list',
+        effectiveProv === 'opencode-zen' ? 'oc-zen-model-suggestions' : 'gemini-model-suggestions'
+      );
+
+      // Check key presence
+      if (!hasKeyForProvider(effectiveProv)) {
+        const provName = effectiveProv === 'opencode-zen' ? 'OpenCode Zen' : 'Google Gemini';
+        warningBadge.innerHTML = `⚠️ <span>${provName} API key is not configured in the API Keys section above.</span>`;
+        warningBadge.style.display = 'flex';
+      } else {
+        warningBadge.style.display = 'none';
+      }
+    }
+
+    domainProviderSelect.addEventListener('change', updateModelFieldState);
+    updateModelFieldState();
+
+    // ── Prompt editor ─────────────────────────────────────────────
     const promptLabel = document.createElement('label');
     promptLabel.className = 'domain-prompt-label';
-    promptLabel.textContent = 'Custom instructions for this domain';
-    promptGroup.appendChild(promptLabel);
-
-    const promptRow = document.createElement('div');
-    promptRow.className = 'domain-prompt-row';
+    promptLabel.textContent = 'Custom Instructions';
+    overridesBlock.appendChild(promptLabel);
 
     const textarea = document.createElement('textarea');
     textarea.className = 'domain-prompt-input';
     textarea.placeholder = 'e.g. Use formal tone, keep proper nouns untranslated, preserve technical terms in English...';
-    textarea.value = currentPrompt;
-    promptRow.appendChild(textarea);
+    textarea.value = currentConfig.prompt || '';
+    overridesBlock.appendChild(textarea);
 
-    const savePromptBtn = document.createElement('button');
-    savePromptBtn.className = 'small-btn prompt-save-btn';
-    savePromptBtn.textContent = 'Save';
-    promptRow.appendChild(savePromptBtn);
+    // ── Save row ───────────────────────────────────────────────────
+    const footerRow = document.createElement('div');
+    footerRow.className = 'domain-footer-row';
 
     const promptStatus = document.createElement('span');
     promptStatus.className = 'prompt-status';
-    promptRow.appendChild(promptStatus);
+    footerRow.appendChild(promptStatus);
 
-    promptGroup.appendChild(promptRow);
+    const saveDomainBtn = document.createElement('button');
+    saveDomainBtn.className = 'prompt-save-btn';
+    saveDomainBtn.textContent = 'Save Domain Settings';
+    footerRow.appendChild(saveDomainBtn);
 
-    savePromptBtn.addEventListener('click', async () => {
-      const val = textarea.value;
+    overridesBlock.appendChild(footerRow);
+
+    saveDomainBtn.addEventListener('click', async () => {
+      const config = {
+        provider: domainProviderSelect.value,
+        model: domainModelInput.value.trim(),
+        prompt: textarea.value.trim(),
+      };
       try {
-        await saveDomainPrompt(domain, val);
-        promptStatus.textContent = 'Saved';
+        await saveDomainConfig(domain, config);
+        promptStatus.textContent = 'Saved!';
         promptStatus.className = 'prompt-status success';
       } catch (err) {
         promptStatus.textContent = `Error: ${err.message}`;
@@ -241,19 +334,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       }, 2500);
     });
 
-    card.appendChild(promptGroup);
+    card.appendChild(overridesBlock);
     return card;
   }
 
-  // ── Save settings ─────────────────────────────────────────────────
+  // ── Save Global Settings ─────────────────────────────────────────
 
   saveBtn.addEventListener('click', async () => {
     const settings = {
       provider: providerSelect.value,
       geminiApiKey: geminiApiKeyInput.value.trim(),
-      geminiModel: geminiModelInput.value || 'gemini-2.5-flash',
+      geminiModel: geminiModelInput.value.trim() || 'gemini-2.5-flash',
       openCodeZenApiKey: ocZenApiKeyInput.value.trim(),
-      openCodeZenModel: ocZenModelInput.value || 'deepseek-v4-flash-free',
+      openCodeZenModel: ocZenModelInput.value.trim() || 'deepseek-v4-flash-free',
       targetLanguage: targetLangInput.value.trim() || 'English',
       autoTranslate: autoTranslateCheck.checked,
       cacheEnabled: cacheEnabledCheck.checked,
@@ -266,8 +359,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       if (saved) {
+        currentSettings = saved;
         saveStatus.textContent = 'Saved!';
         saveStatus.className = 'success';
+        await loadAllSections(); // refresh domain cards with updated defaults
       }
     } catch (err) {
       saveStatus.textContent = `Error: ${err.message}`;
@@ -280,99 +375,99 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 2500);
   });
 
-  // ── Test API key ──────────────────────────────────────────────────
+  // ── Test API Keys ─────────────────────────────────────────────────
 
-  async function testProvider() {
-    const provider = providerSelect.value;
+  testGeminiBtn.addEventListener('click', async () => {
+    const apiKey = geminiApiKeyInput.value.trim();
+    if (!apiKey) {
+      testGeminiStatus.textContent = 'Enter a Gemini API key first.';
+      testGeminiStatus.className = 'test-key-status error';
+      return;
+    }
+    const model = geminiModelInput.value.trim() || 'gemini-2.5-flash';
+    testGeminiStatus.textContent = 'Testing Gemini key...';
+    testGeminiStatus.className = 'test-key-status';
 
-    if (provider === 'gemini') {
-      const apiKey = geminiApiKeyInput.value.trim();
-      if (!apiKey) {
-        testStatus.textContent = 'Enter a Gemini API key first.';
-        testStatus.className = 'error';
-        return;
-      }
-      const model = geminiModelInput.value || 'gemini-2.5-flash';
-      testStatus.textContent = 'Testing Gemini key...';
-      testStatus.className = '';
-
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{ text: 'Reply with exactly the word: OK' }],
-              }],
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const err = await response.text();
-          testStatus.textContent = `Gemini error (${response.status}): ${err.slice(0, 200)}`;
-          testStatus.className = 'error';
-          return;
-        }
-
-        testStatus.textContent = 'Gemini API key works!';
-        testStatus.className = 'success';
-      } catch (err) {
-        testStatus.textContent = `Network error: ${err.message}`;
-        testStatus.className = 'error';
-      }
-    } else {
-      // OpenCode Zen
-      const apiKey = ocZenApiKeyInput.value.trim();
-      if (!apiKey) {
-        testStatus.textContent = 'Enter an OpenCode Zen API key first.';
-        testStatus.className = 'error';
-        return;
-      }
-      const model = ocZenModelInput.value || 'deepseek-v4-flash-free';
-      testStatus.textContent = 'Testing OpenCode Zen key...';
-      testStatus.className = '';
-
-      try {
-        const response = await fetch('https://opencode.ai/zen/v1/chat/completions', {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'user', content: 'Reply with exactly the word: OK' },
-            ],
-            max_tokens: 10,
+            contents: [{
+              parts: [{ text: 'Reply with exactly the word: OK' }],
+            }],
           }),
-        });
-
-        if (!response.ok) {
-          const err = await response.text();
-          testStatus.textContent = `OpenCode Zen error (${response.status}): ${err.slice(0, 200)}`;
-          testStatus.className = 'error';
-          return;
         }
+      );
 
-        testStatus.textContent = 'OpenCode Zen API key works!';
-        testStatus.className = 'success';
-      } catch (err) {
-        testStatus.textContent = `Network error: ${err.message}`;
-        testStatus.className = 'error';
+      if (!response.ok) {
+        const err = await response.text();
+        testGeminiStatus.textContent = `Gemini error (${response.status}): ${err.slice(0, 150)}`;
+        testGeminiStatus.className = 'test-key-status error';
+        return;
       }
+
+      testGeminiStatus.textContent = 'Gemini API key works!';
+      testGeminiStatus.className = 'test-key-status success';
+    } catch (err) {
+      testGeminiStatus.textContent = `Network error: ${err.message}`;
+      testGeminiStatus.className = 'test-key-status error';
     }
 
     setTimeout(() => {
-      testStatus.textContent = '';
-      testStatus.className = '';
+      testGeminiStatus.textContent = '';
+      testGeminiStatus.className = 'test-key-status';
     }, 4000);
-  }
+  });
 
-  testBtn.addEventListener('click', testProvider);
+  testOcZenBtn.addEventListener('click', async () => {
+    const apiKey = ocZenApiKeyInput.value.trim();
+    if (!apiKey) {
+      testOcZenStatus.textContent = 'Enter an OpenCode Zen API key first.';
+      testOcZenStatus.className = 'test-key-status error';
+      return;
+    }
+    const model = ocZenModelInput.value.trim() || 'deepseek-v4-flash-free';
+    testOcZenStatus.textContent = 'Testing OpenCode Zen key...';
+    testOcZenStatus.className = 'test-key-status';
+
+    try {
+      const response = await fetch('https://opencode.ai/zen/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'user', content: 'Reply with exactly the word: OK' },
+          ],
+          max_tokens: 10,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        testOcZenStatus.textContent = `OpenCode Zen error (${response.status}): ${err.slice(0, 150)}`;
+        testOcZenStatus.className = 'test-key-status error';
+        return;
+      }
+
+      testOcZenStatus.textContent = 'OpenCode Zen API key works!';
+      testOcZenStatus.className = 'test-key-status success';
+    } catch (err) {
+      testOcZenStatus.textContent = `Network error: ${err.message}`;
+      testOcZenStatus.className = 'test-key-status error';
+    }
+
+    setTimeout(() => {
+      testOcZenStatus.textContent = '';
+      testOcZenStatus.className = 'test-key-status';
+    }, 4000);
+  });
 
   // ── Toggle key visibility ─────────────────────────────────────────
 
@@ -388,12 +483,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   toggleGeminiKeyBtn.addEventListener('click', () => toggleInput(toggleGeminiKeyBtn, geminiApiKeyInput));
   toggleOcZenKeyBtn.addEventListener('click', () => toggleInput(toggleOcZenKeyBtn, ocZenApiKeyInput));
-
-  // ── Provider switch ───────────────────────────────────────────────
-
-  providerSelect.addEventListener('change', () => {
-    toggleProviderSections(providerSelect.value);
-  });
 
   // ── Support Link ──────────────────────────────────────────────────
 

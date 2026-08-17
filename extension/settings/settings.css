@@ -15,7 +15,7 @@ body {
 }
 
 .container {
-  max-width: 600px;
+  max-width: 620px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -55,7 +55,7 @@ section h2 {
   border-bottom: 1px solid #f1f3f4;
 }
 
-/* ── Fields ────────────────────────────────────────────────────── */
+/* ── Fields & Grid ─────────────────────────────────────────────── */
 
 .field {
   margin-bottom: 16px;
@@ -71,6 +71,19 @@ section h2 {
   font-weight: 500;
   color: #202124;
   margin-bottom: 6px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 520px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .hint {
@@ -108,7 +121,8 @@ select:focus {
 
 .input-row {
   display: flex;
-  gap: 4px;
+  gap: 6px;
+  align-items: center;
 }
 
 .input-row input {
@@ -116,12 +130,12 @@ select:focus {
 }
 
 .small-btn {
-  padding: 4px 10px;
+  padding: 6px 12px;
   background: #f1f3f4;
   border: 1px solid #dadce0;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   white-space: nowrap;
   transition: all 0.15s ease;
 }
@@ -143,6 +157,72 @@ select:focus {
   background: #ea4335;
   color: #fff;
   border-color: #ea4335;
+}
+
+/* ── Dedicated API Key Blocks ─────────────────────────────────── */
+
+.api-key-block {
+  background: #fafbfc;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.api-key-block:last-child {
+  margin-bottom: 0;
+}
+
+.api-key-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.api-key-header label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.key-link {
+  font-size: 12px;
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.key-link:hover {
+  text-decoration: underline;
+}
+
+.test-key-btn {
+  font-weight: 500;
+  color: #1a73e8;
+  background: #fff;
+}
+
+.test-key-btn:hover {
+  background: #e8f0fe;
+  border-color: #1a73e8;
+}
+
+.test-key-status {
+  display: block;
+  font-size: 12px;
+  margin-top: 6px;
+  min-height: 16px;
+  color: #5f6368;
+}
+
+.test-key-status.success {
+  color: #34a853;
+  font-weight: 500;
+}
+
+.test-key-status.error {
+  color: #ea4335;
+  font-weight: 500;
 }
 
 /* ── Checkbox ──────────────────────────────────────────────────── */
@@ -237,20 +317,19 @@ select:focus {
   gap: 12px;
 }
 
-#save-status,
-#test-status {
+#save-status {
   font-size: 12px;
   color: #5f6368;
 }
 
-#save-status.success,
-#test-status.success {
+#save-status.success {
   color: #34a853;
+  font-weight: 500;
 }
 
-#save-status.error,
-#test-status.error {
+#save-status.error {
   color: #ea4335;
+  font-weight: 500;
 }
 
 /* ── Domain management cards ──────────────────────────────────── */
@@ -345,11 +424,47 @@ select:focus {
   background: #fce8e6;
 }
 
-/* ── Per-domain prompt editor ────────────────────────────────── */
+/* ── Domain Overrides & Prompt Block ──────────────────────────── */
 
-.domain-prompt-group {
+.domain-overrides-block {
   border-top: 1px solid #e8eaed;
   padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.domain-override-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .domain-override-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.domain-override-item label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #5f6368;
+  margin-bottom: 4px;
+}
+
+.key-warning-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fef7e0;
+  border: 1px solid #f9ab00;
+  color: #b06000;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .domain-prompt-label {
@@ -357,18 +472,12 @@ select:focus {
   font-size: 12px;
   font-weight: 500;
   color: #5f6368;
-  margin-bottom: 6px;
-}
-
-.domain-prompt-row {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
+  margin-bottom: 4px;
 }
 
 .domain-prompt-input {
-  flex: 1;
-  min-height: 52px;
+  width: 100%;
+  min-height: 50px;
   padding: 8px 10px;
   font-size: 13px;
   font-family: inherit;
@@ -386,8 +495,16 @@ select:focus {
   box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
 }
 
+.domain-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
 .prompt-save-btn {
-  padding: 8px 14px;
+  padding: 6px 14px;
   background: #1a73e8;
   color: #fff;
   border: none;
@@ -396,8 +513,6 @@ select:focus {
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
-  margin-top: 1px;
   transition: background 0.15s;
 }
 
@@ -408,8 +523,6 @@ select:focus {
 .prompt-status {
   font-size: 12px;
   color: #5f6368;
-  flex-shrink: 0;
-  align-self: center;
   min-width: 40px;
 }
 

@@ -16,6 +16,7 @@ const STORAGE_KEYS = {
   SETTINGS: 'settings',
   SECTIONS: 'savedSections',
   DOMAIN_PROMPTS: 'domainPrompts',
+  DOMAIN_CONFIGS: 'domainConfigs',
   CACHE: 'translationCache',
 };
 
@@ -51,6 +52,66 @@ async function deleteSection(id) {
   return filtered;
 }
 
+// ── Domain Configs (Overrides & Prompts) ──────────────────────────────
+
+async function getDomainConfigs() {
+  const {
+    [STORAGE_KEYS.DOMAIN_CONFIGS]: domainConfigs = {},
+    [STORAGE_KEYS.DOMAIN_PROMPTS]: domainPrompts = {},
+  } = await chrome.storage.local.get([STORAGE_KEYS.DOMAIN_CONFIGS, STORAGE_KEYS.DOMAIN_PROMPTS]);
+
+  // Backward-compatible merge with legacy domainPrompts
+  const merged = { ...domainConfigs };
+  for (const [dom, prompt] of Object.entries(domainPrompts)) {
+    if (!merged[dom]) {
+      merged[dom] = { prompt, provider: 'default', model: '' };
+    } else if (!merged[dom].prompt && prompt) {
+      merged[dom].prompt = prompt;
+    }
+  }
+  return merged;
+}
+
+async function setDomainConfig({ domain, config }) {
+  const domainConfigs = await getDomainConfigs();
+  domainConfigs[domain] = {
+    provider: config.provider || 'default',
+    model: (config.model || '').trim(),
+    prompt: (config.prompt || '').trim(),
+  };
+  await chrome.storage.local.set({ [STORAGE_KEYS.DOMAIN_CONFIGS]: domainConfigs });
+
+  // Sync with domainPrompts for compatibility
+  const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
+  domainPrompts[domain] = domainConfigs[domain].prompt;
+  await chrome.storage.local.set({ [STORAGE_KEYS.DOMAIN_PROMPTS]: domainPrompts });
+
+  return { domainConfigs };
+}
+
+async function getActiveConfigForDomain({ domain }) {
+  const settings = await getSettings();
+  const domainConfigs = await getDomainConfigs();
+  const dc = domainConfigs[domain] || {};
+
+  const effectiveProvider = (dc.provider && dc.provider !== 'default') ? dc.provider : settings.provider;
+  const isProviderOverridden = Boolean(dc.provider && dc.provider !== 'default');
+
+  const defaultModelForProvider = effectiveProvider === 'opencode-zen' ? settings.openCodeZenModel : settings.geminiModel;
+  const effectiveModel = dc.model?.trim() || defaultModelForProvider;
+  const isModelOverridden = Boolean(dc.model?.trim());
+
+  const userPrompt = dc.prompt || '';
+
+  return {
+    effectiveProvider,
+    effectiveModel,
+    isProviderOverridden,
+    isModelOverridden,
+    userPrompt,
+  };
+}
+
 // ── Cache helpers ────────────────────────────────────────────────────
 
 async function getCache() {
@@ -80,7 +141,7 @@ async function getCachedTranslations(segments, targetLang, provider, model, prom
   for (let i = 0; i < segments.length; i++) {
     const text = segments[i];
     if (!text || !text.trim()) {
-      results[i] = text; // blank / whitespace strings don't need translation
+      results[i] = text;
       continue;
     }
     const key = await makeCacheKey(text, targetLang, provider, model, prompt);
@@ -140,13 +201,13 @@ function parseJSONSafely(text) {
   // Strip markdown code fences e.g. ```json ... ``` or ``` ... ```
   cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
 
-  // Try direct parse
+  // 1. Direct JSON.parse
   try {
     const parsed = JSON.parse(cleaned);
     if (Array.isArray(parsed)) return parsed;
   } catch {}
 
-  // Attempt to extract JSON array bracket substring [ ... ]
+  // 2. Substring between [ and ]
   const firstBracket = cleaned.indexOf('[');
   const lastBracket = cleaned.lastIndexOf(']');
   if (firstBracket !== -1 && lastBracket > firstBracket) {
@@ -155,14 +216,49 @@ function parseJSONSafely(text) {
       const parsed = JSON.parse(substr);
       if (Array.isArray(parsed)) return parsed;
     } catch {}
+
+    // 3. Remove trailing commas
+    try {
+      const noTrailing = substr.replace(/,\s*([\]}])/g, '$1');
+      const parsed = JSON.parse(noTrailing);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
   }
+
+  // 4. Regex string extractor (handles unescaped newlines, trailing commas, truncated arrays)
+  if (firstBracket !== -1) {
+    const arrayContent = cleaned.slice(firstBracket + 1);
+    const results = [];
+    const strRegex = /"((?:\\.|[^"\\])*)"/gs;
+    let match;
+    while ((match = strRegex.exec(arrayContent)) !== null) {
+      try {
+        const sanitized = match[1]
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t');
+        results.push(JSON.parse('"' + sanitized + '"'));
+      } catch {
+        results.push(match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+      }
+    }
+    if (results.length > 0) return results;
+  }
+
+  // 5. Line by line fallback if returned as a list
+  const lines = cleaned.split('\n')
+    .map(l => l.replace(/^[-*•\d+.]\s*/, '').replace(/^"|"$/g, '').trim())
+    .filter(l => l.length > 0 && l !== '[' && l !== ']');
+  if (lines.length > 0) return lines;
 
   throw new Error(`Failed to parse translated text as JSON array: ${text.slice(0, 150)}...`);
 }
 
 // ── Gemini API (Segments) ────────────────────────────────────────────
 
-async function translateSegmentsWithGemini(segments, apiKey, model, targetLanguage, userPrompt) {
+const CHUNK_SIZE = 25;
+
+async function translateSegmentsBatchGemini(segments, apiKey, model, targetLanguage, userPrompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   let prompt = `You are a precise translator. Translate the following list of web text segments into ${targetLanguage}.
@@ -234,9 +330,23 @@ CRITICAL INSTRUCTIONS:
   return parseJSONSafely(text);
 }
 
+async function translateSegmentsWithGemini(segments, apiKey, model, targetLanguage, userPrompt) {
+  if (segments.length <= CHUNK_SIZE) {
+    return translateSegmentsBatchGemini(segments, apiKey, model, targetLanguage, userPrompt);
+  }
+
+  const results = [];
+  for (let i = 0; i < segments.length; i += CHUNK_SIZE) {
+    const chunk = segments.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await translateSegmentsBatchGemini(chunk, apiKey, model, targetLanguage, userPrompt);
+    results.push(...chunkResults);
+  }
+  return results;
+}
+
 // ── OpenCode Zen API (Segments) ──────────────────────────────────────
 
-async function translateSegmentsWithOpenCodeZen(segments, apiKey, model, targetLanguage, userPrompt) {
+async function translateSegmentsBatchOpenCodeZen(segments, apiKey, model, targetLanguage, userPrompt) {
   const url = 'https://opencode.ai/zen/v1/chat/completions';
 
   const messages = [
@@ -300,6 +410,20 @@ CRITICAL INSTRUCTIONS:
   }
 
   return parseJSONSafely(text);
+}
+
+async function translateSegmentsWithOpenCodeZen(segments, apiKey, model, targetLanguage, userPrompt) {
+  if (segments.length <= CHUNK_SIZE) {
+    return translateSegmentsBatchOpenCodeZen(segments, apiKey, model, targetLanguage, userPrompt);
+  }
+
+  const results = [];
+  for (let i = 0; i < segments.length; i += CHUNK_SIZE) {
+    const chunk = segments.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await translateSegmentsBatchOpenCodeZen(chunk, apiKey, model, targetLanguage, userPrompt);
+    results.push(...chunkResults);
+  }
+  return results;
 }
 
 // ── Legacy HTML Translation Fallbacks ────────────────────────────────
@@ -374,12 +498,25 @@ async function handleTranslate({ segments, html, domain, targetLanguage, forceRe
   try {
     const settings = await getSettings();
     const lang = targetLanguage || settings.targetLanguage;
-    const provider = settings.provider || 'gemini';
     const useCache = settings.cacheEnabled !== false && !forceReTranslate;
 
-    // Per-domain custom instructions
-    const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
-    const userPrompt = domainPrompts[domain] || '';
+    // Resolve per-domain overrides & prompt
+    const {
+      effectiveProvider,
+      effectiveModel,
+      userPrompt,
+    } = await getActiveConfigForDomain({ domain });
+
+    // Validate provider API key
+    if (effectiveProvider === 'opencode-zen') {
+      if (!settings.openCodeZenApiKey) {
+        return { error: `OpenCode Zen API key not configured for ${domain || 'this page'}. Open extension settings to add it.` };
+      }
+    } else {
+      if (!settings.geminiApiKey) {
+        return { error: `Gemini API key not configured for ${domain || 'this page'}. Open extension settings to add it.` };
+      }
+    }
 
     // Modern Segment-based Translation
     if (Array.isArray(segments)) {
@@ -387,21 +524,19 @@ async function handleTranslate({ segments, html, domain, targetLanguage, forceRe
         return { translatedSegments: [], fromCache: true };
       }
 
-      const activeModel = provider === 'opencode-zen' ? settings.openCodeZenModel : settings.geminiModel;
-
       let results = new Array(segments.length).fill(null);
       let missingIndices = [];
       let missingKeys = [];
 
       if (useCache) {
-        const cacheLookup = await getCachedTranslations(segments, lang, provider, activeModel, userPrompt);
+        const cacheLookup = await getCachedTranslations(segments, lang, effectiveProvider, effectiveModel, userPrompt);
         results = cacheLookup.results;
         missingIndices = cacheLookup.missingIndices;
         missingKeys = cacheLookup.missingKeys;
       } else {
         missingIndices = segments.map((_, i) => i);
         missingKeys = await Promise.all(
-          segments.map(s => makeCacheKey(s, lang, provider, activeModel, userPrompt))
+          segments.map(s => makeCacheKey(s, lang, effectiveProvider, effectiveModel, userPrompt))
         );
       }
 
@@ -413,25 +548,19 @@ async function handleTranslate({ segments, html, domain, targetLanguage, forceRe
       const missingSegments = missingIndices.map(i => segments[i]);
 
       let translatedBatch;
-      if (provider === 'opencode-zen') {
-        if (!settings.openCodeZenApiKey) {
-          return { error: 'OpenCode Zen API key not configured. Open extension settings.' };
-        }
+      if (effectiveProvider === 'opencode-zen') {
         translatedBatch = await translateSegmentsWithOpenCodeZen(
           missingSegments,
           settings.openCodeZenApiKey,
-          settings.openCodeZenModel,
+          effectiveModel,
           lang,
           userPrompt
         );
       } else {
-        if (!settings.geminiApiKey) {
-          return { error: 'Gemini API key not configured. Open extension settings.' };
-        }
         translatedBatch = await translateSegmentsWithGemini(
           missingSegments,
           settings.geminiApiKey,
-          settings.geminiModel,
+          effectiveModel,
           lang,
           userPrompt
         );
@@ -461,8 +590,7 @@ async function handleTranslate({ segments, html, domain, targetLanguage, forceRe
 
     // Legacy HTML Translation (Fallback)
     if (typeof html === 'string') {
-      const activeModel = provider === 'opencode-zen' ? settings.openCodeZenModel : settings.geminiModel;
-      const key = await makeCacheKey(html, lang, provider, activeModel, userPrompt);
+      const key = await makeCacheKey(html, lang, effectiveProvider, effectiveModel, userPrompt);
 
       if (useCache) {
         const cache = await getCache();
@@ -472,25 +600,19 @@ async function handleTranslate({ segments, html, domain, targetLanguage, forceRe
       }
 
       let translated;
-      if (provider === 'opencode-zen') {
-        if (!settings.openCodeZenApiKey) {
-          return { error: 'OpenCode Zen API key not configured. Open extension settings.' };
-        }
+      if (effectiveProvider === 'opencode-zen') {
         translated = await translateHtmlWithOpenCodeZen(
           html,
           settings.openCodeZenApiKey,
-          settings.openCodeZenModel,
+          effectiveModel,
           lang,
           userPrompt
         );
       } else {
-        if (!settings.geminiApiKey) {
-          return { error: 'Gemini API key not configured. Open extension settings.' };
-        }
         translated = await translateHtmlWithGemini(
           html,
           settings.geminiApiKey,
-          settings.geminiModel,
+          effectiveModel,
           lang,
           userPrompt
         );
@@ -543,6 +665,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'setDomainPrompt':
       handleSetDomainPrompt(request).then(respond, fail);
       return true;
+    case 'getDomainConfigs':
+      getDomainConfigs().then(domainConfigs => respond({ domainConfigs }), fail);
+      return true;
+    case 'setDomainConfig':
+      setDomainConfig(request).then(respond, fail);
+      return true;
+    case 'getActiveConfigForDomain':
+      getActiveConfigForDomain(request).then(respond, fail);
+      return true;
     case 'clearCache':
       clearCache().then(respond, fail);
       return true;
@@ -582,13 +713,17 @@ async function handleUpdateSettings(newSettings) {
 }
 
 async function handleGetDomainPrompts() {
-  const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
+  const domainConfigs = await getDomainConfigs();
+  const domainPrompts = {};
+  for (const [dom, cfg] of Object.entries(domainConfigs)) {
+    domainPrompts[dom] = cfg.prompt || '';
+  }
   return { domainPrompts };
 }
 
 async function handleSetDomainPrompt({ domain, prompt }) {
-  const { domainPrompts = {} } = await chrome.storage.local.get(STORAGE_KEYS.DOMAIN_PROMPTS);
-  domainPrompts[domain] = prompt;
-  await chrome.storage.local.set({ [STORAGE_KEYS.DOMAIN_PROMPTS]: domainPrompts });
-  return { domainPrompts };
+  const domainConfigs = await getDomainConfigs();
+  const existing = domainConfigs[domain] || { provider: 'default', model: '' };
+  existing.prompt = prompt;
+  return setDomainConfig({ domain, config: existing });
 }
