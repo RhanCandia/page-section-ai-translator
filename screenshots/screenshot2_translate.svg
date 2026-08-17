@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#091e3a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="pulseBorder" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <filter id="shadow2" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="800" fill="url(#bg2)" />
+
+  <!-- Header Text -->
+  <text x="640" y="70" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="800" fill="#ffffff" text-anchor="middle">
+    Seamless AI In-Place Translation
+  </text>
+  <text x="640" y="105" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" fill="#cbd5e1" text-anchor="middle">
+    Auto-translates only what you choose, preserving the rest of the original page
+  </text>
+
+  <!-- Browser Window Mockup -->
+  <g transform="translate(100, 140)" filter="url(#shadow2)">
+    <rect width="1080" height="600" rx="12" fill="#ffffff" />
+    
+    <!-- Titlebar -->
+    <rect width="1080" height="44" rx="12" fill="#f8fafc" />
+    <circle cx="24" cy="22" r="6" fill="#ef4444" />
+    <circle cx="44" cy="22" r="6" fill="#f59e0b" />
+    <circle cx="64" cy="22" r="6" fill="#10b981" />
+    <rect x="120" y="8" width="560" height="28" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+    <text x="140" y="27" font-family="monospace" font-size="13" fill="#64748b">https://news.ycombinator.com/item?id=4390123</text>
+
+    <!-- Page Header (Untranslated) -->
+    <text x="60" y="90" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">
+      Show HN: Lightweight Autonomous Agent Tooling
+    </text>
+    <text x="60" y="118" font-family="system-ui, sans-serif" font-size="13" fill="#64748b">
+      182 points by dev_explorer 4 hours ago | hide | 86 comments
+    </text>
+
+    <!-- Translated Section Card with Rainbow / AI Glowing Border -->
+    <g transform="translate(50, 150)">
+      <!-- AI Glow / Pulsing Border -->
+      <rect width="980" height="260" rx="10" fill="#ffffff" stroke="url(#pulseBorder)" stroke-width="3" />
+      
+      <!-- AI Badge -->
+      <g transform="translate(24, 20)">
+        <rect width="150" height="26" rx="13" fill="#e0e7ff" />
+        <text x="75" y="17" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#4338ca" text-anchor="middle">
+          ✨ Translated to Spanish
+        </text>
+      </g>
+
+      <g transform="translate(185, 20)">
+        <rect width="160" height="26" rx="13" fill="#ecfdf5" />
+        <text x="80" y="17" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#047857" text-anchor="middle">
+          ⚡ Gemini 2.0 Flash
+        </text>
+      </g>
+
+      <!-- Translated Content (Spanish example) -->
+      <text x="24" y="80" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#1e293b">
+        Descripción del Proyecto y Metas Principales:
+      </text>
+      <text x="24" y="114" font-family="system-ui, sans-serif" font-size="15" fill="#334155" line-height="1.5">
+        Hemos desarrollado esta biblioteca para facilitar la integración de modelos de lenguaje en flujos de trabajo locales.
+      </text>
+      <text x="24" y="144" font-family="system-ui, sans-serif" font-size="15" fill="#334155">
+        El rendimiento se ha optimizado reduciendo la latencia de respuesta en un 35% sin requerir configuraciones complejas.
+      </text>
+      <text x="24" y="174" font-family="system-ui, sans-serif" font-size="15" fill="#334155">
+        Todas las claves de API permanecen seguras en el almacenamiento local del cliente y nunca se transfieren a servidores externos.
+      </text>
+
+      <!-- Code Snippet inside preserved -->
+      <g transform="translate(24, 196)">
+        <rect width="520" height="38" rx="6" fill="#f1f5f9" />
+        <text x="16" y="24" font-family="monospace" font-size="13" fill="#0f172a">
+          npm install @agent-kit/translator-core
+        </text>
+      </g>
+    </g>
+
+    <!-- Untranslated Comments below -->
+    <g transform="translate(60, 445)">
+      <text x="0" y="0" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#64748b">
+        ▲ sarah_c 2 hours ago
+      </text>
+      <text x="0" y="24" font-family="system-ui, sans-serif" font-size="14" fill="#334155">
+        This is fantastic! The fact that the rest of the page remains intact is a huge productivity boost.
+      </text>
+      <rect x="0" y="44" width="800" height="1" fill="#f1f5f9" />
+      <text x="0" y="70" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#64748b">
+        ▲ alex_m 1 hour ago
+      </text>
+      <text x="0" y="94" font-family="system-ui, sans-serif" font-size="14" fill="#334155">
+        Works seamlessly with custom domain prompts as well.
+      </text>
+    </g>
+  </g>
+</svg>

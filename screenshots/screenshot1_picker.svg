@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="800" fill="url(#bg1)" />
+
+  <!-- Header Text -->
+  <text x="640" y="70" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="800" fill="#ffffff" text-anchor="middle">
+    Visual Section Picker
+  </text>
+  <text x="640" y="105" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="400" fill="#94a3b8" text-anchor="middle">
+    Click any element on any website to target it for instant AI translation
+  </text>
+
+  <!-- Browser Window Mockup -->
+  <g transform="translate(100, 140)" filter="url(#shadow)">
+    <!-- Window Frame -->
+    <rect width="1080" height="600" rx="12" fill="#ffffff" />
+    
+    <!-- Browser Titlebar -->
+    <rect width="1080" height="44" rx="12" fill="#f1f5f9" />
+    <circle cx="24" cy="22" r="6" fill="#ef4444" />
+    <circle cx="44" cy="22" r="6" fill="#f59e0b" />
+    <circle cx="64" cy="22" r="6" fill="#10b981" />
+
+    <!-- URL Bar -->
+    <rect x="120" y="8" width="560" height="28" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+    <text x="140" y="27" font-family="monospace" font-size="13" fill="#64748b">https://docs.technology.org/research-report</text>
+
+    <!-- Webpage Content -->
+    <text x="60" y="90" font-family="system-ui, sans-serif" font-size="24" font-weight="700" fill="#0f172a">
+      Autonomous AI Agent Architecture
+    </text>
+    <text x="60" y="125" font-family="system-ui, sans-serif" font-size="14" fill="#475569">
+      Published on October 14 • 8 min read • Research Insights
+    </text>
+
+    <!-- Normal Content Paragraph -->
+    <rect x="60" y="150" width="600" height="12" rx="3" fill="#e2e8f0" />
+    <rect x="60" y="172" width="560" height="12" rx="3" fill="#e2e8f0" />
+    <rect x="60" y="194" width="480" height="12" rx="3" fill="#e2e8f0" />
+
+    <!-- Highlighted Target Section -->
+    <g transform="translate(50, 230)">
+      <rect width="660" height="180" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2.5" stroke-dasharray="6 4" />
+      
+      <!-- Corner brackets -->
+      <path d="M 0 16 L 0 0 L 16 0" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" />
+      <path d="M 660 16 L 660 0 L 644 0" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" />
+      <path d="M 0 164 L 0 180 L 16 180" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" />
+      <path d="M 660 164 L 660 180 L 644 180" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" />
+
+      <!-- Section Text inside -->
+      <text x="20" y="38" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#1e40af">
+        Executive Summary &amp; Key Findings
+      </text>
+      <text x="20" y="70" font-family="system-ui, sans-serif" font-size="14" fill="#1e3a8a">
+        Modern autonomous systems utilize multi-agent workflows with tool-calling capabilities...
+      </text>
+      <text x="20" y="98" font-family="system-ui, sans-serif" font-size="14" fill="#1e3a8a">
+        Through proactive error correction and self-healing mechanisms, productivity increased by 42%.
+      </text>
+      <text x="20" y="126" font-family="system-ui, sans-serif" font-size="14" fill="#1e3a8a">
+        This framework supports modular integrations across distributed cloud environments.
+      </text>
+
+      <!-- Selector Badge Floating -->
+      <g transform="translate(16, 142)">
+        <rect width="320" height="26" rx="4" fill="#1d4ed8" />
+        <text x="12" y="18" font-family="monospace" font-size="12" font-weight="600" fill="#ffffff">
+          🎯 main > section.summary > div.content
+        </text>
+      </g>
+    </g>
+
+    <!-- Normal Content below -->
+    <rect x="60" y="440" width="580" height="12" rx="3" fill="#e2e8f0" />
+    <rect x="60" y="462" width="520" height="12" rx="3" fill="#e2e8f0" />
+
+    <!-- Extension Popup Overlay (Right Side) -->
+    <g transform="translate(740, 20)" filter="url(#shadow)">
+      <rect width="300" height="380" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+      
+      <!-- Popup Header -->
+      <rect width="300" height="48" rx="8" fill="#ffffff" />
+      <line x1="0" y1="48" x2="300" y2="48" stroke="#f1f5f9" stroke-width="1" />
+      <text x="16" y="32" font-family="system-ui, sans-serif" font-size="16" font-weight="700" fill="#1a73e8">AI Translate</text>
+      <text x="270" y="32" font-family="system-ui, sans-serif" font-size="16" fill="#64748b">⚙</text>
+
+      <!-- Domain -->
+      <text x="16" y="74" font-family="system-ui, sans-serif" font-size="13" fill="#64748b">docs.technology.org</text>
+
+      <!-- Pick Button (Active) -->
+      <rect x="16" y="92" width="268" height="40" rx="6" fill="#1a73e8" />
+      <text x="150" y="117" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">
+        + Pick Section
+      </text>
+
+      <!-- Saved Sections Title -->
+      <text x="16" y="162" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#94a3b8" letter-spacing="0.5">SAVED SECTIONS</text>
+
+      <!-- Saved Section Item 1 -->
+      <g transform="translate(16, 175)">
+        <rect width="268" height="60" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1" />
+        <circle cx="16" cy="30" r="4" fill="#10b981" />
+        <text x="28" y="26" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#0f172a">Executive Summary</text>
+        <text x="28" y="44" font-family="monospace" font-size="10" fill="#94a3b8">section.summary</text>
+      </g>
+
+      <!-- Footer -->
+      <line x1="0" y1="335" x2="300" y2="335" stroke="#f1f5f9" stroke-width="1" />
+      <rect x="160" y="345" width="124" height="24" rx="12" fill="#fef2f2" stroke="#fecaca" stroke-width="1" />
+      <text x="222" y="361" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#ef4444" text-anchor="middle">
+        ☕ Buy me a coffee
+      </text>
+    </g>
+  </g>
+</svg>
