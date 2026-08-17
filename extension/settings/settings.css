@@ -372,3 +372,39 @@ select:focus {
 .prompt-status.error {
   color: #ea4335;
 }
+
+/* ── Support & Ko-fi Card ─────────────────────────────────────── */
+
+.support-section {
+  background: #ffffff;
+  border: 1px solid #dadce0;
+}
+
+.kofi-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: #ff5e5b;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(255, 94, 91, 0.25);
+}
+
+.kofi-settings-btn:hover {
+  background: #e84c49;
+  box-shadow: 0 2px 6px rgba(255, 94, 91, 0.35);
+  transform: translateY(-1px);
+}
+
+.kofi-settings-btn:active {
+  transform: translateY(0);
+}
+
+.kofi-settings-btn .kofi-icon {
+  font-size: 16px;
+}

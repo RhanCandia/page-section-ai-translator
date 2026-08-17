@@ -350,6 +350,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     toggleProviderSections(providerSelect.value);
   });
 
+  // ── Support Link ──────────────────────────────────────────────────
+
+  const kofiSettingsLink = document.getElementById('kofi-settings-link');
+  if (kofiSettingsLink) {
+    kofiSettingsLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: 'https://ko-fi.com/rhncnd' });
+    });
+  }
+
   // ── Init ──────────────────────────────────────────────────────────
 
   await loadSettings();

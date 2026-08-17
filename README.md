@@ -1,5 +1,7 @@
 # Page Section AI Translator
 
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Development-FF5E5B?style=flat&logo=kofi&logoColor=white)](https://ko-fi.com/rhncnd)
+
 A Chrome extension that lets you pick any section of a webpage, save it by domain, and auto-translate it via an AI provider (Google Gemini or OpenCode Zen) on every subsequent page load.
 
 ## Features
@@ -99,6 +101,12 @@ The background message dispatcher routes to the selected provider. Adding a new 
 - `mimo-v2.5-free`, `ling-3.0-flash-free`, `nemotron-3-ultra-free`
 
 Paid models like `deepseek-v4-flash` or `claude-sonnet-4.6` are faster and have no timeouts.
+
+## Support & Donation
+
+If you enjoy using **Page Section AI Translator** or it saves you time, consider supporting future development:
+
+<a href="https://ko-fi.com/rhncnd" target="_blank"><img src="https://storage.ko-fi.com/cdn/kofi3.png?v=3" height="36" style="border:0px;height:36px;" alt="Buy Me a Coffee at ko-fi.com" /></a>
 
 ## Contributing
 

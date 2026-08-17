@@ -193,6 +193,10 @@ header h1 {
 footer {
   padding: 8px 16px;
   border-top: 1px solid #e8eaed;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fafbfc;
 }
 
 #status {
@@ -206,4 +210,32 @@ footer {
 
 #status.success {
   color: #34a853;
+}
+
+.kofi-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #5f6368;
+  text-decoration: none;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: #f1f3f4;
+  border: 1px solid #dadce0;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+
+.kofi-link:hover {
+  background: #ff5e5b;
+  color: #ffffff;
+  border-color: #ff5e5b;
+  box-shadow: 0 1px 3px rgba(255, 94, 91, 0.3);
+}
+
+.kofi-icon {
+  font-size: 12px;
+  line-height: 1;
 }

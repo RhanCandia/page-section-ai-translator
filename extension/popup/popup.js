@@ -121,11 +121,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // ── Settings ────────────────────────────────────────────────────
+  // ── Settings & Links ────────────────────────────────────────────
 
   settingsBtn.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
+
+  const kofiLink = document.getElementById('kofi-link');
+  if (kofiLink) {
+    kofiLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: 'https://ko-fi.com/rhncnd' });
+    });
+  }
 
   // ── Utilities ───────────────────────────────────────────────────
 
