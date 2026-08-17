@@ -492,8 +492,8 @@ async function autoTranslate(force = false) {
     return;
   }
 
-  // Translate sections in parallel batches of 3
-  const BATCH = 3;
+  // Translate sections sequentially to prevent API concurrency rate limits
+  const BATCH = 1;
   let translated = 0;
 
   const eligible = [];
@@ -543,7 +543,8 @@ async function autoTranslate(force = false) {
         translationStatus[sel] = 'failed';
         if (r.status === 'rejected') {
           console.error('[AI Translator] Translation error:', r.reason);
-          showToast('Translation failed: check console for details', true);
+          const errorMsg = r.reason?.message || 'Translation failed';
+          showToast(errorMsg, true);
         }
       }
     }

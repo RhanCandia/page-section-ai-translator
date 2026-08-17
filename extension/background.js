@@ -254,6 +254,43 @@ function parseJSONSafely(text) {
   throw new Error(`Failed to parse translated text as JSON array: ${text.slice(0, 150)}...`);
 }
 
+// ── HTTP Fetch with Automatic Retry on Rate Limits (429 / 503) ───────
+
+async function fetchWithRetry(url, options, maxRetries = 2) {
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000); // 3 min
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      // If rate limited or server temporarily overloaded, back off and retry
+      if (response.status === 429 || response.status === 503 || response.status === 529) {
+        if (attempt < maxRetries) {
+          attempt++;
+          const delayMs = attempt * 2500; // 2.5s, 5.0s
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          continue;
+        }
+      }
+      return response;
+    } catch (err) {
+      clearTimeout(timeout);
+      if (attempt < maxRetries && err.name !== 'AbortError') {
+        attempt++;
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 // ── Gemini API (Segments) ────────────────────────────────────────────
 
 const CHUNK_SIZE = 25;
@@ -275,10 +312,7 @@ CRITICAL INSTRUCTIONS:
 
   prompt += `\n\nJSON array to translate:\n${JSON.stringify(segments)}`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 300000); // 5 min
-
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -295,14 +329,14 @@ CRITICAL INSTRUCTIONS:
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
       ],
     }),
-    signal: controller.signal,
   });
-
-  clearTimeout(timeout);
 
   if (!response.ok) {
     const errBody = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${errBody}`);
+    if (response.status === 429 || errBody.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error('Gemini rate limit exceeded. Please wait a moment before trying again.');
+    }
+    throw new Error(`Gemini API error ${response.status}: ${errBody.slice(0, 180)}`);
   }
 
   const data = await response.json();
@@ -337,6 +371,9 @@ async function translateSegmentsWithGemini(segments, apiKey, model, targetLangua
 
   const results = [];
   for (let i = 0; i < segments.length; i += CHUNK_SIZE) {
+    if (i > 0) {
+      await new Promise(r => setTimeout(r, 400));
+    }
     const chunk = segments.slice(i, i + CHUNK_SIZE);
     const chunkResults = await translateSegmentsBatchGemini(chunk, apiKey, model, targetLanguage, userPrompt);
     results.push(...chunkResults);
@@ -378,10 +415,7 @@ CRITICAL INSTRUCTIONS:
     content: `Translate this JSON array to ${targetLanguage}:\n${JSON.stringify(segments)}`,
   });
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 300000); // 5 min
-
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -393,14 +427,14 @@ CRITICAL INSTRUCTIONS:
       temperature: 0.3,
       max_tokens: 16384,
     }),
-    signal: controller.signal,
   });
-
-  clearTimeout(timeout);
 
   if (!response.ok) {
     const errBody = await response.text();
-    throw new Error(`OpenCode Zen API error ${response.status}: ${errBody}`);
+    if (response.status === 429 || errBody.includes('FreeUsageLimitError') || errBody.includes('Rate limit')) {
+      throw new Error('OpenCode Zen free rate limit reached. Please wait a few moments, or switch to Google Gemini (higher free limits) in settings.');
+    }
+    throw new Error(`OpenCode Zen API error ${response.status}: ${errBody.slice(0, 180)}`);
   }
 
   const data = await response.json();
@@ -419,6 +453,9 @@ async function translateSegmentsWithOpenCodeZen(segments, apiKey, model, targetL
 
   const results = [];
   for (let i = 0; i < segments.length; i += CHUNK_SIZE) {
+    if (i > 0) {
+      await new Promise(r => setTimeout(r, 600)); // pace free tier requests
+    }
     const chunk = segments.slice(i, i + CHUNK_SIZE);
     const chunkResults = await translateSegmentsBatchOpenCodeZen(chunk, apiKey, model, targetLanguage, userPrompt);
     results.push(...chunkResults);
